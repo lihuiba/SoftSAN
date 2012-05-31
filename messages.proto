@@ -155,7 +155,7 @@ message NewVolume_Request {
 }
 
 message NewVolume_Response {
-    optional utin32 token=100;
+    optional uint32 token=100;
     optional string error=101;
 }
 
@@ -166,7 +166,7 @@ message ChMod_Request {
 }
 
 message ChMod_Response {
-    optional utin32 token=100;
+    optional uint32 token=100;
     optional string error=101;
 }
 
@@ -201,34 +201,34 @@ message RepairVolume_Response {
 }
 
 message MoveVolume_Request {
-    optional utin32 token=100;
+    optional uint32 token=100;
     required string volume=1;
     required string destination=2;
 }
 
 message MoveVolume_Response {
-    optional utin32 token=100;
+    optional uint32 token=100;
     optional string error=101;
 }
 
 message DeleteVolume_Request {
-    optional utin32 token=100;
+    optional uint32 token=100;
     required string volume=1;
 }
 
 message DeleteVolume_Response {
-    optional utin32 token=100;
+    optional uint32 token=100;
     optional string error=101;
 }
 
 message CreateLink_Request {
-    optional utin32 token=100;
+    optional uint32 token=100;
     required string destination=1;
     required string link=2;
 }
 
 message CreateLink_Response {
-    optional utin32 token=100;
+    optional uint32 token=100;
     optional string error=101;
 }
 
