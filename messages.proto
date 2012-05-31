@@ -1,4 +1,4 @@
-message GUID {
+message Guid {
     required fixed32 a=1;
     required fixed32 b=2;
     required fixed32 c=3;
@@ -6,8 +6,8 @@ message GUID {
 }
 
 message ChunkInfo {
-    required GUID guid=1;
-    required uint32 size=2;	//in MB
+    required Guid guid=1;
+    required uint32 size=2;    //in MB
 //    optional uint32 reside_on_disk=3;
 }
 
@@ -17,28 +17,28 @@ message SMARTInfo {
         required uint32 value=2;
         required uint32 worst=3;
         required uint32 thresh=4;
-        required string type=5;		//todo
-        required string updated=6;	//todo
-        required string when_failed=7;	//todo
-        required uint32 raw_value=8;	//todo
+        required string type=5;                  //todo
+        required string updated=6;           //todo
+        required string when_failed=7;     //todo
+        required uint32 raw_value=8;       //todo
     }
-    optional Record Raw_Read_Error_Rate		=1;
-    optional Record Spin_Up_Time		=3;
-    optional Record Start_Stop_Count		=4;
-    optional Record Reallocated_Sector_Ct	=5;
-    optional Record Seek_Error_Rate		=7;
-    optional Record Power_On_Hours		=9;
-    optional Record Spin_Retry_Count		=10;
-    optional Record Calibration_Retry_Count	=11;
-    optional Record Power_Cycle_Count		=12;
-    optional Record PowerOff_Retract_Count	=192;
-    optional Record Load_Cycle_Count		=193;
-    optional Record Temperature_Celsius		=194;	//in celsius degree
-    optional Record Reallocated_Event_Count	=196;
-    optional Record Current_Pending_Sector	=197;
-    optional Record Offline_Uncorrectable	=198;
-    optional Record UDMA_CRC_Error_Count	=199;
-    optional Record Multi_Zone_Error_Rate	=200;	
+    optional Record Raw_Read_Error_Rate        =1;
+    optional Record Spin_Up_Time        =3;
+    optional Record Start_Stop_Count        =4;
+    optional Record Reallocated_Sector_Ct    =5;
+    optional Record Seek_Error_Rate        =7;
+    optional Record Power_On_Hours        =9;
+    optional Record Spin_Retry_Count        =10;
+    optional Record Calibration_Retry_Count    =11;
+    optional Record Power_Cycle_Count        =12;
+    optional Record PowerOff_Retract_Count    =192;
+    optional Record Load_Cycle_Count        =193;
+    optional Record Temperature_Celsius        =194;    //in celsius degree
+    optional Record Reallocated_Event_Count    =196;
+    optional Record Current_Pending_Sector    =197;
+    optional Record Offline_Uncorrectable    =198;
+    optional Record UDMA_CRC_Error_Count    =199;
+    optional Record Multi_Zone_Error_Rate    =200;    
 /*
   1 Raw_Read_Error_Rate     0x000f   200   200   051    Pre-fail  Always       -       0
   3 Spin_Up_Time            0x0003   178   169   021    Pre-fail  Always       -       6066
@@ -63,9 +63,9 @@ message SMARTInfo {
 
 message DiskInfo {
     optional string id=1;
-    optional GUID guid=2;
-    required uint32 size=3;	//in GB
-    required uint32 free=4;	//in GB
+    optional Guid guid=2;
+    required uint32 size=3;    //in GB
+    required uint32 free=4;    //in GB
     required uint32 number_chunks=5;
     optional bool isSSD=6;
     optional SMARTInfo smart=7;
@@ -75,7 +75,7 @@ message MachineInfo {
     required uint32 cpu_sockets=1;
     required uint32 cpu_cores=2;
     required uint32 cpu_threads=3;
-    required uint32 memory=4;	//in GB
+    required uint32 memory=4;    //in GB
     optional string uname_a=5;
 }
 
@@ -93,8 +93,8 @@ message ChunkServerInfo {
 
 message NewChunk_Request {
     optional uint32 token=100;
-    required uint32 size=1;	//in MB
-    optional Guid location=2;	//can be server guid or disk guid
+    required uint32 size=1;       //in MB
+    optional Guid location=2;    //can be server guid or disk guid
 }
 
 message NewChunk_Response {
@@ -116,10 +116,10 @@ message DeleteChunk_Response {
 }
 
 message Volume {
-    optional Guid chunk=100;	//A volume is either a chunk,
-    repeated Volume subvolumes=1;	//or a list of sub-volumes
-    optional string assembler=2;	//that is assembled by an assembler.
-    required uint64 size=3;	//in MB
+    optional Guid chunk=100;                //A volume is either a chunk,
+    repeated Volume subvolumes=1;    //or a list of sub-volumes
+    optional string assembler=2;          //that is assembled by an assembler.
+    required uint64 size=3;                  //in MB
 }
 
 message VolumePackage {
@@ -127,24 +127,24 @@ message VolumePackage {
 }
 
 message ReadVolume_Request {
-	optional uint32 token=100;
-	required string fullpath=1;
+    optional uint32 token=100;
+    required string fullpath=1;
 }
 
 message ReadVolume_Response {
-	optional uint32 token=100;
-	required Volume volume=2;
+    optional uint32 token=100;
+    required Volume volume=2;
 }
 
 message WriteVolume_Request {
-	optional uint32 token=100;
-	required string fullpath=1;
-	required Volume volume=2;
+    optional uint32 token=100;
+    required string fullpath=1;
+    required Volume volume=2;
 }
 
 message WriteVolume_Response {
-	optional uint32 token=100;
-	optional string error=101;
+    optional uint32 token=100;
+    optional string error=101;
 }
 
 message NewVolume_Request {
