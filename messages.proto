@@ -1,0 +1,229 @@
+message GUID {
+    required fixed32 a=1;
+    required fixed32 b=2;
+    required fixed32 c=3;
+    required fixed32 d=4;
+}
+
+message ChunkInfo {
+    required GUID guid=1;
+    required uint32 size=2;	//in MB
+//    optional uint32 reside_on_disk=3;
+}
+
+message SMARTInfo {
+    message Record {
+        required uint32 flag=1;
+        required uint32 value=2;
+        required uint32 worst=3;
+        required uint32 thresh=4;
+        required string type=5;		//todo
+        required string updated=6;	//todo
+        required string when_failed=7;	//todo
+        required uint32 raw_value=8;	//todo
+    }
+    optional Record Raw_Read_Error_Rate		=1;
+    optional Record Spin_Up_Time		=3;
+    optional Record Start_Stop_Count		=4;
+    optional Record Reallocated_Sector_Ct	=5;
+    optional Record Seek_Error_Rate		=7;
+    optional Record Power_On_Hours		=9;
+    optional Record Spin_Retry_Count		=10;
+    optional Record Calibration_Retry_Count	=11;
+    optional Record Power_Cycle_Count		=12;
+    optional Record PowerOff_Retract_Count	=192;
+    optional Record Load_Cycle_Count		=193;
+    optional Record Temperature_Celsius		=194;	//in celsius degree
+    optional Record Reallocated_Event_Count	=196;
+    optional Record Current_Pending_Sector	=197;
+    optional Record Offline_Uncorrectable	=198;
+    optional Record UDMA_CRC_Error_Count	=199;
+    optional Record Multi_Zone_Error_Rate	=200;	
+/*
+  1 Raw_Read_Error_Rate     0x000f   200   200   051    Pre-fail  Always       -       0
+  3 Spin_Up_Time            0x0003   178   169   021    Pre-fail  Always       -       6066
+  4 Start_Stop_Count        0x0032   100   100   000    Old_age   Always       -       212
+  5 Reallocated_Sector_Ct   0x0033   200   200   140    Pre-fail  Always       -       0
+  7 Seek_Error_Rate         0x000e   100   253   051    Old_age   Always       -       0
+  9 Power_On_Hours          0x0032   058   058   000    Old_age   Always       -       30815
+ 10 Spin_Retry_Count        0x0012   100   100   051    Old_age   Always       -       0
+ 11 Calibration_Retry_Count 0x0012   100   100   051    Old_age   Always       -       0
+ 12 Power_Cycle_Count       0x0032   100   100   000    Old_age   Always       -       211
+192 Power-Off_Retract_Count 0x0032   200   200   000    Old_age   Always       -       190
+193 Load_Cycle_Count        0x0032   200   200   000    Old_age   Always       -       224
+194 Temperature_Celsius     0x0022   107   095   000    Old_age   Always       -       43
+196 Reallocated_Event_Count 0x0032   200   200   000    Old_age   Always       -       0
+197 Current_Pending_Sector  0x0012   200   200   000    Old_age   Always       -       0
+198 Offline_Uncorrectable   0x0010   200   200   000    Old_age   Offline      -       0
+199 UDMA_CRC_Error_Count    0x003e   200   200   000    Old_age   Always       -       0
+200 Multi_Zone_Error_Rate   0x0008   200   200   051    Old_age   Offline      -       0
+*/
+    optional string smartctl_all=1000;
+}
+
+message DiskInfo {
+    optional string id=1;
+    optional GUID guid=2;
+    required uint32 size=3;	//in GB
+    required uint32 free=4;	//in GB
+    required uint32 number_chunks=5;
+    optional bool isSSD=6;
+    optional SMARTInfo smart=7;
+}
+
+message MachineInfo {
+    optional string uname_a;
+    required uint32 cpu_sockets;
+    required uint32 cpu_cores;
+    required uint32 cpu_threads;
+    required uint32 memory;	//in GB
+}
+
+message LoadInfo{
+
+}
+
+message ChunkServerInfo {
+    required Guid guid;
+    optional MachineInfo machine;
+    repeated DiskInfo disks;
+    repeated ChunkInfo chunks;
+    optional LoadInfo load;
+}
+
+message NewChunk_Request {
+    optional uint32 token;
+    required uint32 size;	//in MB
+    optional Guid location;	//can be server guid or disk guid
+}
+
+message NewChunk_Response {
+    optional uint32 token;
+    required uint32 size;
+    required Guid guid;
+    optional string error;
+}
+
+message DeleteChunk_Request {
+    optional uint32 token;
+    required Guid guid;
+}
+
+message DeleteChunk_Response {
+    optional uint32 token;
+    required Guid guid;
+    optional string error;
+}
+
+message Volume {
+    optional Guid chunk;	//A volume is either a chunk,
+    repeated Volume subvolumes;	//or a list of sub-volumes
+    optional string assembler;	//that is assembled by an assembler.
+    required uint64 size;	//in MB
+}
+
+message VolumePackage {
+    required bytes volume=1;
+}
+
+message NewVolume_Request {
+    optional uint32 token;
+    required string fullpath;
+    required uint32 mod;
+    optional Volume volume;
+}
+
+message NewVolume_Response {
+    optional utin32 token=100;
+    optional string error;
+}
+
+message ChMod_Request {
+    optional uint32 token;
+    required string fullpath;
+    required uint32 mod;
+}
+
+message ChMod_Response {
+    optional utin32 token=100;
+    optional string error;
+}
+
+//also used to "assemble" (active) a single chunk
+message AssembleVolume_Request {
+    optional uint32 token;
+    required Volume volume;
+}
+
+message AssembleVolume_Response {
+    optional uint32 token;
+    required string access_point;
+    repeated string APs; // all the access points, if results in more than one.
+    optional string error;
+}
+
+message DisassembleVolume_Request {
+    optional uint32 token;
+    required string access_point;
+}
+
+message DisassembleVolume_Response {
+    optional uint32 token;
+    required string access_point;
+    optional string error;
+}
+
+message RepairVolume_Request {
+}
+
+message RepairVolume_Response {
+}
+
+message MoveVolume_Request {
+    optional utin32 token=100;
+    requried string volume=1;
+    required string destination=2;
+}
+
+message MoveVolume_Response {
+    optional utin32 token=100;
+    optional string error;
+}
+
+message DeleteVolume_Request {
+    optional utin32 token=100;
+    requried string volume=1;
+}
+
+message DeleteVolume_Response {
+    optional utin32 token=100;
+    optional string error;
+}
+
+message CreateLink_Request {
+    optional utin32 token=100;
+    required string destination=1;
+    requried string link=2;
+}
+
+message CreateLink_Response {
+    optional utin32 token=100;
+    optional string error;
+}
+
+service MDSService {
+    rpc NewChunk(NewChunk_Request) returns (NewChunk_Response);
+    rpc DeleteChunk(DeleteChunk_Request) returns (DeleteChunk_Response);
+    rpc NewVolume(NewVolume_Request) returns(NewVolume_Response);
+    rpc AssembleVolume(AssembleVolume_Request) returns (AssembleVolume_Response);
+    rpc DisassembleVolume(DisassembleVolume_Request) returns (DisassembleVolume_Response);
+    rpc RepairVolume(RepairVolume_Request) returns (RepairVolume_Response);
+    rpc GetVolume() returns(VolumePackage);
+    rpc SetVolume(VolumePackage) returns();
+    rpc MoveVolume(MoveVolume_Request) returns(MoveVolume_Response);
+    rpc ChMod(ChMod_Request) returns(ChMod_Response);
+    rpc DeleteVolume(DeleteVolume_Request) returns(DeleteVolume_Response);
+}
+
+
+

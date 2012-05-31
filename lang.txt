@@ -1,0 +1,22 @@
+function remote_wb_rd1(list)
+    rd	= list[0].host.raid1(list[1:])
+    wb	= list[0].host.writeback(list[0], rd)
+end
+
+IDs	= {912837, 123523, 23414, 234, 34564, 14325, ...}
+chunks	= import(IDs)			//import from MDS
+blocks	= apply_on_each(splitby(_,4*MB), chunks))
+blockss	= blocks.join()
+#blocks	= reorder(blockss, 72384)	//randomly reorder elements with a seed 72384
+rot	= {5,2,3,7,4,6,...}		//reorder table
+blocks	= reorder(blockss, rot)
+groups	= blocks.splitby(3)
+#r	= apply_on_each(raid1, groups)
+r	= apply_on_each(remoe_wb_rd1, groups)
+JBOD(r)
+
+
+
+sugar:
+foo(_,234,b,_,c)   ===   function(arg1, arg2) foo(arg1,234,b,arg2,c) end
+obj.foo(a,b,c)	   ===   foo(obj,a,b,c)

@@ -1,0 +1,25 @@
+MDS: 
+	1.知晓每个CS的存在情况、Chunk信息、健康状况（in-memory）
+	2.发出或转发对Chunk的元操作（新建、删除、装配、拆卸、修复等），支持指定位置新建，转发装配请求
+	3.记录Chunk信息，如ID和位置的对应关系
+	4.记录顶层Volume信息（volume的分层概念，subvolume，chunk也是一个volume）
+	5.Volume操作：建立（空），更新（整个地、原子地），移动（含更名），硬软链接，删除
+	6.Volume具有权限，跟Linux权限相仿，group对应为租户
+	*.每个volume的元数据集分别存储为不同文件，如volume“foo.bar”的元数据集分别为“foo.bar.xyz”、“foo.bar.abc”等，核心必有元数据集为“foo.bar.0”
+	*.装配脚本单独存放，Volume中只引用脚本名称
+	*.PB（pbc）+ Redis
+	+.resize、reorder序列、使用大小（UsedSize for BigData）、
+	+.高层元信息：记录装配信息（装配脚本、参数）、Cache内容
+	
+
+ChunkServer（CS）：
+	1.由ChunkDaemon和iSCSI服务器两部分（两进程）组成，使用LVM作为存储后端
+	2.执行对Chunk的元操作（新建、删除、激活、去活等）
+	3.向MDS汇报自身状况
+
+ClientTool：
+	1.
+
+
+Thin、TRIM、dedup、CoD（ConnOnDemand）、
+
