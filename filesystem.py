@@ -7,6 +7,7 @@ def overrides(interface_class):
         return method
     return overrider
 
+#TODO: GC, restore and history view
 class FileSystem:
     """an abstract base class that is to be derived to class FilesystemCDP 
     and class HistoryView"""
@@ -194,7 +195,11 @@ class FileSystemCDP(FileSystem):
             if not os.path.isdir(ppath):
                 raise IOError("parent directory doesn't exist!")
             self.protect_dir(apath, 'add')
-            os.mkdir(apath)
+            old_target=ppath+'.'+target
+            if os.path.isdir(old_target):
+                os.rename(old_target, apath)
+            else:
+                os.mkdir(apath)
     
     @overrides(FileSystem)
     def mv(self, src, dest):
