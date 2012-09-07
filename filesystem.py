@@ -1,4 +1,4 @@
-import os, os.path, shutil
+import os, os.path, shutil, logging
 import time, datetime, zipfile
 
 def overrides(interface_class):
@@ -45,7 +45,8 @@ class FileSystemCDP(FileSystem):
             raise IOError("path doesn't exist!")
         self.root=root+'/'
 
-    def check_path(self, path):
+    @staticmethod
+    def check_path(path):
         if not path.startswith('/'):
             raise ValueError("relative path is not allowed!")
         p=path
@@ -70,6 +71,7 @@ class FileSystemCDP(FileSystem):
                 time.sleep(0)
                 print('High change rate on '+path)
             ar.write(path, arcfn)
+        logging.debug('protected file: '+path)
         return tm
 
     @staticmethod
@@ -100,8 +102,9 @@ class FileSystemCDP(FileSystem):
             raise ValueError("op should be add, rm or mv")
         difn=ppath+'/.__dirinfo__'
         with open(difn, 'a') as fp:
-            s='\t'.join(log)+'\n'
-            fp.write(s)
+            s='\t'.join(log)
+            fp.write(s+'\n')
+        logging.debug("protected dir: '{0}' with journal '{1}'".format(path, s))
         return strtime,fn,ppath
 
     @staticmethod
@@ -112,6 +115,7 @@ class FileSystemCDP(FileSystem):
 
     @overrides(FileSystem)
     def get(self, path):
+        logging.debug("@get: "+path)
         self.check_path(path)
         path=self.root+path
         with open(path, 'rb') as fp:
@@ -120,6 +124,7 @@ class FileSystemCDP(FileSystem):
 
     @overrides(FileSystem)
     def listdir(self, path):
+        logging.debug("@listdir: "+path)
         self.check_path(path)
         apath=self.root+path
         ldir=self.listdir_filtered(apath)
@@ -127,6 +132,7 @@ class FileSystemCDP(FileSystem):
 
     @overrides(FileSystem)
     def put(self, path, data):
+        logging.debug("@put: "+path)
         self.check_path(path)
         path=self.root+path
         if os.path.isdir(path):
@@ -140,6 +146,7 @@ class FileSystemCDP(FileSystem):
 
     @overrides(FileSystem)
     def rm(self, path):
+        logging.debug("@rm: "+path)
         self.check_path(path)
         path=self.root+path
         if not os.path.isfile(path):
@@ -150,6 +157,7 @@ class FileSystemCDP(FileSystem):
 
     @overrides(FileSystem)
     def rmdir(self, path, fr=None):
+        logging.debug("@rmdir (-fr=={0}) '{1}'".format(fr,path))
         self.check_path(path)
         apath=self.root+path
         if not os.path.isdir(apath):
@@ -174,6 +182,7 @@ class FileSystemCDP(FileSystem):
     
     @overrides(FileSystem)
     def exists(self, path):
+        logging.debug("@exists: "+path)
         self.check_path(path)
         path=self.root+path
         ret=os.path.exists(path)
@@ -181,6 +190,7 @@ class FileSystemCDP(FileSystem):
     
     @overrides(FileSystem)
     def mkdir(self, path, r=None):
+        logging.debug("@mkdir (-r=={0}): '{1}'".format(r, path))
         self.check_path(path)
         apath=self.root+path               #absolute path
         if os.path.exists(apath):
@@ -203,6 +213,7 @@ class FileSystemCDP(FileSystem):
     
     @overrides(FileSystem)
     def mv(self, src, dest):
+        logging.debug("@mv from '{0}' to {1}".format(src, dest))
         self.check_path(src)
         asrc=self.root+src
         if not os.path.exists(asrc):
@@ -226,6 +237,7 @@ class FileSystemCDP(FileSystem):
         shutil.move(asrc, adest)
 
 if __name__=="__main__":
+    logging.basicConfig(level=logging.DEBUG)
     test='d:\\test'
     if os.path.isdir(test):
         shutil.rmtree(test)
@@ -243,10 +255,10 @@ if __name__=="__main__":
     print cdp.get('/adf')
     cdp.mkdir('/adf2')
     cdp.mkdir('/adf3/kkk/ccc', r=True)
-    try:
+#    try:
         cdp.put('/adf2', 'ooop')
-    except IOError as e:
-        print e
+#    except IOError as e:
+#        print e
     cdp.mv('/aaa', '/adf3')
     cdp.mv('/adf', '/asdf')
     cdp.rm('/asdf')
