@@ -1,0 +1,4 @@
+#ignore .metadata
+.metadata
+#ignore obj and lib file
+*.[oa]
