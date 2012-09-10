@@ -1,5 +1,6 @@
 import inspect
 import logging
+import sys
 
 
 # class Wrapper:
@@ -13,21 +14,31 @@ import logging
 # 	def find(dict, name):
 # 		if dict[name] and 
 
-def AttachCatcher(obj, functions):
-	if functions==None:
-		functions=[x in dir(obj) if inspect.isroutine(x) and not x.startswith('__') ]
-	# if functions is string:
-	# 	functions=[functions]
-	for func in functions:
-		f=getattr(obj, func)
-		def wrapper(*args, **kwargs):
-			try:
-				ret=f(*args, **kwargs)
-				return ret
-			except Error as e:
-				logging.error('exception caught: '+str(e))
-		setattr(obj, func, wrapper)
+def GetWrapper(obj, f):
+	def wrapper(*args, **kwargs):
+		try:
+			ret=f(obj, *args, **kwargs)
+			return ret
+		except:
+			(E, e, trace) = sys.exc_info()
+			logging.error('exception caught: '+str(e))
+			logging.error(str(trace))
+	return wrapper
 
+
+def AttachCatcher(obj, functions):
+	cdict=obj.__class__.__dict__
+	if functions==None:
+		functions=cdict
+	if isinstance(functions, basestring):
+		functions=(functions,)
+	for func in functions:
+		f=cdict[func]
+		if not inspect.isfunction(f):
+			continue
+		wrapper=GetWrapper(obj, f)
+		obj.__dict__[func]=wrapper
+	return obj
 
 if __name__=="__main__":
 	class kkkk:
@@ -39,8 +50,7 @@ if __name__=="__main__":
 	k=kkkk()
 	kc=AttachCatcher(k, ["abcd", "asdf"])
 	print(kc.__dict__)
-	f=kc.abcd
-	f(1,2)
-	kc.abcd(1,2)
-	kc.asdf("asdf",1)
-	kc=AttachCatcher(k)
+	kc.abcd(2)
+	# kc.abcd(2)
+	kc.asdf("asdf")
+	print ("OK")
