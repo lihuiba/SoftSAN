@@ -1,5 +1,6 @@
 import os, os.path, shutil, logging
 import time, datetime, zipfile
+import catcher
 
 def overrides(interface_class):
     def overrider(method):
@@ -36,6 +37,12 @@ class FileSystem:
         """move a file/dir to another place"""
         raise NotImplementedError( "Should have implemented this" )
 
+class ZipFile(zipfile.ZipFile):
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
 class FileSystemCDP(FileSystem):
     """a concrete FileSystem class that implements a continueous data protection (CDP).
     Any modification performed by this class can be un-done"""
@@ -61,7 +68,7 @@ class FileSystemCDP(FileSystem):
             raise IOError("file doesn't exist!")
         ppath,fn=os.path.split(path)
         zipfn=ppath+'/.'+fn
-        with zipfile.ZipFile(zipfn, 'a') as ar:
+        with ZipFile(zipfn, 'a') as ar:
             namelist=ar.namelist()
             while True:
                 tm=time.time()
@@ -238,13 +245,14 @@ class FileSystemCDP(FileSystem):
 
 if __name__=="__main__":
     logging.basicConfig(level=logging.DEBUG)
-    test='d:\\test'
+    test='c:\\test'
     if os.path.isdir(test):
         shutil.rmtree(test)
     time.sleep(0.5)
     os.makedirs(test)
     test_=test.replace('\\','/')
     cdp=FileSystemCDP(test_)
+    cdp=catcher.AttachCatcher(cdp)
     cdp.put('/asdf', 'kkkkkkkkkkk')
     cdp.put('/asdf', 'llllll')
     cdp.put('/asdf', 'ooop')
@@ -255,22 +263,13 @@ if __name__=="__main__":
     print cdp.get('/adf')
     cdp.mkdir('/adf2')
     cdp.mkdir('/adf3/kkk/ccc', r=True)
-#    try:
-        cdp.put('/adf2', 'ooop')
-#    except IOError as e:
-#        print e
+    cdp.put('/adf2', 'ooop')
     cdp.mv('/aaa', '/adf3')
     cdp.mv('/adf', '/asdf')
     cdp.rm('/asdf')
     #cdp.rm('/adf')
-    try:
-        cdp.rm('/adf')
-    except IOError as e:
-        print e
-    try:
-        cdp.rmdir('/adf3')
-    except IOError as e:
-        print e
+    cdp.rm('/adf')
+    cdp.rmdir('/adf3')
     cdp.rmdir('/adf3', fr=True)
 
     

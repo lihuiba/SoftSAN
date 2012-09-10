@@ -2,18 +2,6 @@ import inspect
 import logging
 import sys
 
-
-# class Wrapper:
-# 	_target=None
-# 	def __init__(self, target):
-# 		_target=target
-# 	def __getattr__(self, name):
-# 		ret=self.find(_target.__dict__, name) or self.find(_target.__class__.__dict__, name)
-# 		return ret
-# 	@staticmethod
-# 	def find(dict, name):
-# 		if dict[name] and 
-
 def GetWrapper(obj, f):
 	def wrapper(*args, **kwargs):
 		try:
@@ -21,21 +9,23 @@ def GetWrapper(obj, f):
 			return ret
 		except:
 			(E, e, trace) = sys.exc_info()
-			logging.error('exception caught: '+str(e))
-			logging.error(str(trace))
+			logging.warning('exception caught: '+str(e))
+			logging.warning(str(trace))
 	return wrapper
 
-
-def AttachCatcher(obj, functions):
+def AttachCatcher(obj, functions=None):
 	cdict=obj.__class__.__dict__
 	if functions==None:
 		functions=cdict
 	if isinstance(functions, basestring):
 		functions=(functions,)
 	for func in functions:
+		if func.startswith('__'):
+			continue
 		f=cdict[func]
 		if not inspect.isfunction(f):
 			continue
+		print "Wrapping ", func
 		wrapper=GetWrapper(obj, f)
 		obj.__dict__[func]=wrapper
 	return obj

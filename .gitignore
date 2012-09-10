@@ -2,3 +2,4 @@
 .metadata
 #ignore obj and lib file
 *.[oa]
+*.pyc
