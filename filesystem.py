@@ -42,6 +42,7 @@ class ZipFile(zipfile.ZipFile):
         return self
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
+        return true
 
 class FileSystemCDP(FileSystem):
     """a concrete FileSystem class that implements a continueous data protection (CDP).
@@ -242,6 +243,88 @@ class FileSystemCDP(FileSystem):
             arg=dest
         self.protect_dir(asrc, 'mv', arg)
         shutil.move(asrc, adest)
+
+class GCbyExpiration:
+    cdp=None
+    expiration=30
+    def __init__(self, cdp, expiration=30):
+        """the cdp object, and expiration (days)"""
+        self.expiration=expiration*24*60*60   #converting days into seconds
+        self.cdp=cdp
+
+    def isArchiveOlder(afn, threshold):
+        with ZipFile(afn, 'r') as ar:
+            names=ar.namelist()
+        for name in names:
+            parts=name.rsplit('.', 2)
+            if len(parts)!=3 or not parts[1].isdigit() or not parts[2].isdigit():
+                msg="unrecognized file name {0} in archive {1}".format(name, afn)
+                logging.warning(msg)
+                continue
+            timestamp=float(parts[1])
+            if timestamp<threshold:     #older than threshold
+                return True
+        return False
+
+    def gc():
+        threshold=time.time()-expiration
+        for dir,_,files in os.walk(cdp.root):
+            files=[x for x in files if x.startswith('.') and not x.startswith('..')]
+            for afn in files:
+                pafn=os.path.join(dir, afn)
+                if isArchiveOlder(pafn, threshold):
+                    # rename '.xxx'(afn) into '..xxx'(aafn), 
+                    # potentially deleting an existing latter one.
+                    aafn='.'+afn
+                    paafn=os.path.join(dir, aafn)
+                    if os.path.isfile(paafn):
+                        os.remove(paafn)
+                    elif os.path.isdir(paafn):
+                        raise IOError("path '{0}' should not be a directory!".format(paafn))
+                    os.rename(pafn, paafn); 
+
+class HistoryView(FileSystem):
+    cdp=None
+    timestamp=None
+    def __init__(self, cdp, timestamp=None):
+        self.cdp=cdp
+        if timestamp==None: self.timestamp=timestamp
+        else: self.timestamp=time.time()
+    
+    def timeGoto(self, timestamp):
+        self.timestamp=timestamp
+
+    @overrides(FileSystem)
+    def get(self, path):
+        pass
+
+    @overrides(FileSystem)
+    def put(self, path, data):
+        pass
+
+    @overrides(FileSystem)
+    def listdir(self, path):
+        pass
+
+    @overrides(FileSystem)
+    def rm(self, path):
+        pass
+
+    @overrides(FileSystem)
+    def exists(self, path):
+        pass
+
+    @overrides(FileSystem)
+    def mkdir(self, path, p):
+        pass
+
+    @overrides(FileSystem)
+    def rmdir(self, path, f, r):
+        pass
+
+    @overrides(FileSystem)
+    def mv(self, src, dest):
+        pass
 
 if __name__=="__main__":
     logging.basicConfig(level=logging.DEBUG)
