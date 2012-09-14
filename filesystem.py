@@ -36,13 +36,77 @@ class FileSystem:
     def mv(self, src, dest):
         """move a file/dir to another place"""
         raise NotImplementedError( "Should have implemented this" )
+    @staticmethod
+    def check_path(path):
+        if not path.startswith('/'):
+            raise ValueError("relative path is not allowed!")
+        p=path
+        while len(p)>1:
+            p,n=os.path.split(p)
+            if n.startswith('.') or n.startswith('__'):
+                raise ValueError("file/directory names can NOT start with '.' or '__'.")
+    @staticmethod
+    def path_do_split(path):
+        a,b=os.path.split(path)
+        if b=='':
+            a,b=os.path.split(a)
+        return a,b
 
-class ZipFile(zipfile.ZipFile):
+class Archive(zipfile.ZipFile):
+    names=None
+    timestamps=None
     def __enter__(self):
         return self
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
         return true
+    
+    @staticmethod
+    def name2TimeStamp(name):
+        parts=name.rsplit('.', 2)
+        if len(parts)!=3 or not parts[1].isdigit() or not parts[2].isdigit():
+            msg="unrecognized file name {0} in archive {1}".format(name, afn)
+            logging.warning(msg)
+            return 
+        ts=float(parts[1]+'.'+parts[2])
+        return ts
+
+    def getTimeStamps(self):
+        if self.timestamps!=None: 
+            return self.timestamps
+        self.names=self.namelist()
+        self.timestamps=[]
+        for name in self.names:
+            ts=name2TimeStamp(name)
+            self.timestamps.append( (name,ts) )
+        self.timestamps.sort(key=(lambda x:x[1]), reverse=True)
+        return self.timestamps
+
+    def isArchiveOlder(self, threshold):
+        tss=self.getTimeStamps()
+        return tss[-1][1]<threshold
+
+    def lowerBound(self, threshold):
+        """this function returns the smallest index of 
+        self.timestamps whose [1] is smaller than threshold,
+        returns None if it doesn't exist."""
+        for i in range(len(self.timestamps)):
+            if self.timestamps[i][1]<threshold:
+                return i
+        return None
+
+    def upperBound(self, threshold):
+        """this function returns the biggest index of 
+        self.timestamps whose [1] is bigger than threshold,
+        returns None if it doesn't exist."""
+        if self.timestamps[0][1]<threshold:
+            return None
+        for i in range(len(timestamps)):
+            if self.timestamps[i][1]>threshold:
+                return i-1
+        return None
+
+
 
 class FileSystemCDP(FileSystem):
     """a concrete FileSystem class that implements a continueous data protection (CDP).
@@ -54,22 +118,12 @@ class FileSystemCDP(FileSystem):
         self.root=root+'/'
 
     @staticmethod
-    def check_path(path):
-        if not path.startswith('/'):
-            raise ValueError("relative path is not allowed!")
-        p=path
-        while len(p)>1:
-            p,n=os.path.split(p)
-            if n.startswith('.') or n.startswith('__'):
-                raise ValueError("file/directory names can NOT start with '.' or '__'.")
-
-    @staticmethod
     def protect_file(path):
         if not os.path.isfile(path):
             raise IOError("file doesn't exist!")
         ppath,fn=os.path.split(path)
         zipfn=ppath+'/.'+fn
-        with ZipFile(zipfn, 'a') as ar:
+        with Archive(zipfn, 'a') as ar:
             namelist=ar.namelist()
             while True:
                 tm=time.time()
@@ -81,13 +135,6 @@ class FileSystemCDP(FileSystem):
             ar.write(path, arcfn)
         logging.debug('protected file: '+path)
         return tm
-
-    @staticmethod
-    def path_do_split(path):
-        a,b=os.path.split(path)
-        if b=='':
-            a,b=os.path.split(a)
-        return a,b
 
     @staticmethod
     def protect_dir(path, op, arg=None, timestamp=None):
@@ -186,7 +233,7 @@ class FileSystemCDP(FileSystem):
                 raise IOError("target directory not empty!")
         _,name,ppath=self.protect_dir(apath, 'rm')
         newname=ppath+'/.'+name
-        os.rename(apath, newname)
+        os.rename(apath, newname)    #todo: combine existing '.xxx' directory
     
     @overrides(FileSystem)
     def exists(self, path):
@@ -252,27 +299,15 @@ class GCbyExpiration:
         self.expiration=expiration*24*60*60   #converting days into seconds
         self.cdp=cdp
 
-    def isArchiveOlder(afn, threshold):
-        with ZipFile(afn, 'r') as ar:
-            names=ar.namelist()
-        for name in names:
-            parts=name.rsplit('.', 2)
-            if len(parts)!=3 or not parts[1].isdigit() or not parts[2].isdigit():
-                msg="unrecognized file name {0} in archive {1}".format(name, afn)
-                logging.warning(msg)
-                continue
-            timestamp=float(parts[1])
-            if timestamp<threshold:     #older than threshold
-                return True
-        return False
-
-    def gc():
+    def gc(self):
         threshold=time.time()-expiration
-        for dir,_,files in os.walk(cdp.root):
+        for dir,_,files in os.walk(self.cdp.root):
             files=[x for x in files if x.startswith('.') and not x.startswith('..')]
             for afn in files:
                 pafn=os.path.join(dir, afn)
-                if isArchiveOlder(pafn, threshold):
+                with Archive(afn, 'r') as ar:
+                    old=ar.isArchiveOlder(threshold)
+                if old:
                     # rename '.xxx'(afn) into '..xxx'(aafn), 
                     # potentially deleting an existing latter one.
                     aafn='.'+afn
@@ -294,39 +329,86 @@ class HistoryView(FileSystem):
     def timeGoto(self, timestamp):
         self.timestamp=timestamp
 
-    @overrides(FileSystem)
-    def get(self, path):
-        pass
+    @staticmethod
+def pathSplitAll(path):
+    ret=[]
+    head=path
+    while True:
+        (head, tail) = os.path.split(head)
+        if tail=='': break
+        ret.append(tail)
+    ret.reverse()
+    return ret
+
+    def readDirInfo(self, path):
+        ret=[]
+        fn=os.path.join(self.cdp.root, path, '.__dirinfo__')
+        with open(fn) as fp:
+            for line in fp:
+                sp=line.split('\t',2)
+                tm=datetime.datetime.strptime(sp[0], '%Y-%m-%d %H:%M:%S.%f'))
+                op=sp[1]
+                fn=sp[2]
+                ret.add( (tm,op,fn) )
+        return ret
 
     @overrides(FileSystem)
-    def put(self, path, data):
-        pass
+    def get(self, path):
+        self.check_path(path)
+        dirs=pathSplitAll(path)
+        filename=dirs.pop()
+        current=self.cdp.root
+        for item in dirs:
+            temp=os.path.join(current, item)
+            if os.path.isdir(temp):
+                current=temp
+                continue
+            temp=os.path.join(current, '.'+item)
+            if os.path.isdir(temp):
+                current=temp
+                continue
+            raise IOError('incorrect path: '{0}'.'.format(path))
+
+
+
+
+
+
+
+    # HistoryView doesn't support modification
+    # @overrides(FileSystem)
+    # def put(self, path, data):
+    #     pass
 
     @overrides(FileSystem)
     def listdir(self, path):
         pass
 
-    @overrides(FileSystem)
-    def rm(self, path):
-        pass
+    # HistoryView doesn't support modification
+    # @overrides(FileSystem)
+    # def rm(self, path):
+    #     pass
 
     @overrides(FileSystem)
     def exists(self, path):
         pass
 
-    @overrides(FileSystem)
-    def mkdir(self, path, p):
-        pass
+    # HistoryView doesn't support modification
+    # @overrides(FileSystem)
+    # def mkdir(self, path, p):
+    #     pass
 
-    @overrides(FileSystem)
-    def rmdir(self, path, f, r):
-        pass
+    # HistoryView doesn't support modification
+    # @overrides(FileSystem)
+    # def rmdir(self, path, f, r):
+    #     pass
 
-    @overrides(FileSystem)
-    def mv(self, src, dest):
-        pass
+    # HistoryView doesn't support modification
+    # @overrides(FileSystem)
+    # def mv(self, src, dest):
+    #     pass
 
-if __name__=="__main__":
+def test_filesystem():
     logging.basicConfig(level=logging.DEBUG)
     test='c:\\test'
     if os.path.isdir(test):
@@ -356,4 +438,5 @@ if __name__=="__main__":
     cdp.rmdir('/adf3', fr=True)
 
     
-
+if __name__=="__main__":
+    test_filesystem()
