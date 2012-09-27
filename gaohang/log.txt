@@ -1,0 +1,2 @@
+1.2012-09-25
+添加 ParseTGT.py Target.py Lun.py,初步实现tgt控制器的几种功能（具体见help，运行python ParseTGT.py help）
