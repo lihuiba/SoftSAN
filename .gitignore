@@ -3,3 +3,5 @@
 #ignore obj and lib file
 *.[oa]
 *.pyc
+#ignore generated code
+messages_pb2.py
