@@ -12,6 +12,11 @@ def overrides(interface_class):
 class FileSystem:
     """an abstract base class that is to be derived to class FilesystemCDP 
     and class HistoryView"""
+    root='/'
+    def __init__(self, root):
+        if not os.path.isdir(root):
+            raise IOError("path doesn't exist!")
+        self.root=root+'/'
     def get(self, path):
         """read thet content of a file"""
         raise NotImplementedError( "Should have implemented this" )
@@ -54,12 +59,6 @@ class FileSystem:
 
 class FileSystemNaked(FileSystem):
     """an naked filesystem implemention, which passes requests directly to OS"""
-    root='/'
-    def __init__(self, root):
-        if not os.path.isdir(root):
-            raise IOError("path doesn't exist!")
-        self.root=root+'/'
-
     @overrides(FileSystem)
     def get(self, path):
         logging.debug("@get: "+path)
@@ -188,12 +187,6 @@ class Archive(zipfile.ZipFile):
 class FileSystemCDP(FileSystem):
     """a concrete FileSystem class that implements a continueous data protection (CDP).
     Any modification performed by this class can be un-done"""
-    root='/'
-    def __init__(self, root):
-        if not os.path.isdir(root):
-            raise IOError("path doesn't exist!")
-        self.root=root+'/'
-
     @staticmethod
     def protect_file(path):
         if not os.path.isfile(path):
