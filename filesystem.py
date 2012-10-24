@@ -52,6 +52,85 @@ class FileSystem:
             a,b=os.path.split(a)
         return a,b
 
+class FileSystemNaked(FileSystem):
+    """an naked filesystem implemention, which passes requests directly to OS"""
+    root='/'
+    def __init__(self, root):
+        if not os.path.isdir(root):
+            raise IOError("path doesn't exist!")
+        self.root=root+'/'
+
+    @overrides(FileSystem)
+    def get(self, path):
+        logging.debug("@get: "+path)
+        self.check_path(path)
+        apath=self.root+path
+        with open(apath, 'rb') as fp:
+            data=fp.read()
+        return data
+
+    @overrides(FileSystem)
+    def listdir(self, path):
+        logging.debug("@listdir: "+path)
+        self.check_path(path)
+        apath=self.root+path
+        ldir=os.listdir(apath)
+        return ldir
+
+    @overrides(FileSystem)
+    def put(self, path, data):
+        logging.debug("@put: "+path)
+        self.check_path(path)
+        apath=self.root+path
+        with open(apath, 'wb') as fp:
+            fp.write(data)
+
+    @overrides(FileSystem)
+    def rm(self, path):
+        logging.debug("@rm: "+path)
+        self.check_path(path)
+        apath=self.root+path
+        os.remove(apath)
+
+    @overrides(FileSystem)
+    def rmdir(self, path, fr=None):
+        logging.debug("@rmdir (-fr=={0}) '{1}'".format(fr,path))
+        self.check_path(path)
+        apath=self.root+path
+        if not os.path.isdir(apath):
+            raise IOError("target not exists as a directory!")
+        if fr:
+            shutil.rmtree(apath)
+        else:
+            os.rmdir(apath)
+    
+    @overrides(FileSystem)
+    def exists(self, path):
+        logging.debug("@exists: "+path)
+        self.check_path(path)
+        apath=self.root+path
+        ret=os.path.exists(apath)
+        return ret
+    
+    @overrides(FileSystem)
+    def mkdir(self, path, r=None):
+        logging.debug("@mkdir (-r=={0}): '{1}'".format(r, path))
+        self.check_path(path)
+        apath=self.root+path               #absolute path
+        if r:
+            os.makedirs(apath)
+        else:
+            os.mkdir(apath)
+    
+    @overrides(FileSystem)
+    def mv(self, src, dest):
+        logging.debug("@mv from '{0}' to {1}".format(src, dest))
+        self.check_path(src)
+        self.check_path(dest)
+        asrc=self.root+src
+        adest=self.root+dest
+        shutil.move(asrc, adest)
+
 class Archive(zipfile.ZipFile):
     names=None
     timestamps=None
@@ -59,7 +138,7 @@ class Archive(zipfile.ZipFile):
         return self
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
-        return true
+        return True
     
     @staticmethod
     def name2TimeStamp(name):
@@ -105,8 +184,6 @@ class Archive(zipfile.ZipFile):
             if self.timestamps[i][1]>threshold:
                 return i-1
         return None
-
-
 
 class FileSystemCDP(FileSystem):
     """a concrete FileSystem class that implements a continueous data protection (CDP).
@@ -330,15 +407,15 @@ class HistoryView(FileSystem):
         self.timestamp=timestamp
 
     @staticmethod
-def pathSplitAll(path):
-    ret=[]
-    head=path
-    while True:
-        (head, tail) = os.path.split(head)
-        if tail=='': break
-        ret.append(tail)
-    ret.reverse()
-    return ret
+    def pathSplitAll(path):
+        ret=[]
+        head=path
+        while True:
+            (head, tail) = os.path.split(head)
+            if tail=='': break
+            ret.append(tail)
+        ret.reverse()
+        return ret
 
     def readDirInfo(self, path):
         ret=[]
@@ -346,7 +423,7 @@ def pathSplitAll(path):
         with open(fn) as fp:
             for line in fp:
                 sp=line.split('\t',2)
-                tm=datetime.datetime.strptime(sp[0], '%Y-%m-%d %H:%M:%S.%f'))
+                tm=datetime.datetime.strptime(sp[0], '%Y-%m-%d %H:%M:%S.%f')
                 op=sp[1]
                 fn=sp[2]
                 ret.add( (tm,op,fn) )
@@ -367,12 +444,7 @@ def pathSplitAll(path):
             if os.path.isdir(temp):
                 current=temp
                 continue
-            raise IOError('incorrect path: '{0}'.'.format(path))
-
-
-
-
-
+            raise IOError("incorrect path: '{0}'.".format(path))
 
 
     # HistoryView doesn't support modification
@@ -408,35 +480,47 @@ def pathSplitAll(path):
     # def mv(self, src, dest):
     #     pass
 
-def test_filesystem():
-    logging.basicConfig(level=logging.DEBUG)
-    test='c:\\test'
-    if os.path.isdir(test):
-        shutil.rmtree(test)
-    time.sleep(0.5)
-    os.makedirs(test)
-    test_=test.replace('\\','/')
-    cdp=FileSystemCDP(test_)
-    cdp=catcher.AttachCatcher(cdp)
-    cdp.put('/asdf', 'kkkkkkkkkkk')
-    cdp.put('/asdf', 'llllll')
-    cdp.put('/asdf', 'ooop')
-    cdp.put('/adf', 'ooddddp')
-    cdp.put('/adf', 'ooop')
-    cdp.put('/aaa', 'xxxxxxxxxxxxxxxxxxxxxxx')
-    print cdp.get('/asdf')
-    print cdp.get('/adf')
-    cdp.mkdir('/adf2')
-    cdp.mkdir('/adf3/kkk/ccc', r=True)
-    cdp.put('/adf2', 'ooop')
-    cdp.mv('/aaa', '/adf3')
-    cdp.mv('/adf', '/asdf')
-    cdp.rm('/asdf')
-    #cdp.rm('/adf')
-    cdp.rm('/adf')
-    cdp.rmdir('/adf3')
-    cdp.rmdir('/adf3', fr=True)
+############################# TESTs #############################################
+def test_filesystem(fs):
+    fs=catcher.AttachCatcher(fs)
+    fs.put('/asdf', 'kkkkkkkkkkk')
+    fs.put('/asdf', 'llllll')
+    fs.put('/asdf', 'ooop')
+    fs.put('/adf', 'ooddddp')
+    fs.put('/adf', 'ooop')
+    fs.put('/aaa', 'xxxxxxxxxxxxxxxxxxxxxxx')
+    print fs.get('/asdf')
+    print fs.get('/adf')
+    fs.mkdir('/adf2')
+    fs.mkdir('/adf3/kkk/ccc', r=True)
+    fs.put('/adf2', 'ooop')
+    fs.mv('/aaa', '/adf3')
+    fs.mv('/adf', '/asdf')
+    fs.rm('/asdf')
+    #fs.rm('/adf')
+    fs.rm('/adf')
+    fs.rmdir('/adf3')
+    fs.rmdir('/adf3', fr=True)
 
-    
+def test_prepare_dir(dir):
+    dir=os.path.expanduser('~/santest/'+dir)
+    if os.path.isdir(dir):
+        shutil.rmtree(dir)
+    time.sleep(0.5)
+    os.makedirs(dir)
+    return dir
+
+def test_filesystemCDP():
+    dir=test_prepare_dir('/fscdp/')
+    cdp=FileSystemCDP(dir)
+    test_filesystem(cdp)
+
+def test_filesystemNaked():
+    dir=test_prepare_dir('/fsnaked/')
+    naked=FileSystemNaked(dir)
+    test_filesystem(naked)
+
 if __name__=="__main__":
-    test_filesystem()
+    logging.basicConfig(level=logging.DEBUG)
+    test_filesystemCDP()
+    test_filesystemNaked()

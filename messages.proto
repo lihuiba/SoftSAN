@@ -17,10 +17,10 @@ message SMARTInfo {
         required uint32 value=2;
         required uint32 worst=3;
         required uint32 thresh=4;
-        required string type=5;                  //todo
-        required string updated=6;           //todo
-        required string when_failed=7;     //todo
-        required uint32 raw_value=8;       //todo
+        required string type=5;                 //todo
+        required string updated=6;              //todo
+        required string when_failed=7;          //todo
+        required uint32 raw_value=8;            //todo
     }
     optional Record Raw_Read_Error_Rate        =1;
     optional Record Spin_Up_Time        =3;
@@ -94,7 +94,7 @@ message ChunkServerInfo {
 message NewChunk_Request {
     optional uint32 token=100;
     required uint32 size=1;       //in MB
-    optional Guid location=2;    //can be server guid or disk guid
+    optional Guid location=2;     //can be server guid or disk guid
 }
 
 message NewChunk_Response {
@@ -117,9 +117,9 @@ message DeleteChunk_Response {
 
 message Volume {
     optional Guid chunk=100;                //A volume is either a chunk,
-    repeated Volume subvolumes=1;    //or a list of sub-volumes
-    optional string assembler=2;          //that is assembled by an assembler.
-    required uint64 size=3;                  //in MB
+    repeated Volume subvolumes=1;           //or a list of sub-volumes
+    optional string assembler=2;            //that is assembled by an assembler.
+    required uint64 size=3;                 //in MB
 }
 
 message VolumePackage {
@@ -179,7 +179,7 @@ message AssembleVolume_Request {
 message AssembleVolume_Response {
     optional uint32 token=100;
     required string access_point=1;
-    repeated string APs=2; // all the access points, if results in more than one.
+    repeated string APs=2;               // all the access points, if results in more than one.
     optional string error=101;
 }
 
