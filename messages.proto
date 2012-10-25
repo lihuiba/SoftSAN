@@ -1,5 +1,4 @@
 option py_generic_services = false;
-
 message Guid {
     required fixed32 a=1;
     required fixed32 b=2;
@@ -9,7 +8,7 @@ message Guid {
 
 message Request {
     required uint32 token=1;
-    required Guid caller=2
+    required Guid caller=2;
     required string method=3;
     required bytes argument=4;
 }
@@ -112,19 +111,16 @@ message NewChunk_Request {
 }
 
 message NewChunk_Response {
-    optional uint32 token=100;
     required uint32 size=1;
     required Guid guid=2;
     optional string error=101;
 }
 
 message DeleteChunk_Request {
-    optional uint32 token=100;
     required Guid guid=1;
 }
 
 message DeleteChunk_Response {
-    optional uint32 token=100;
     required Guid guid=1;
     optional string error=101;
 }
@@ -141,69 +137,57 @@ message VolumePackage {
 }
 
 message ReadVolume_Request {
-    optional uint32 token=100;
     required string fullpath=1;
 }
 
 message ReadVolume_Response {
-    optional uint32 token=100;
     required Volume volume=2;
 }
 
 message WriteVolume_Request {
-    optional uint32 token=100;
     required string fullpath=1;
     required Volume volume=2;
 }
 
 message WriteVolume_Response {
-    optional uint32 token=100;
     optional string error=101;
 }
 
 message NewVolume_Request {
-    optional uint32 token=100;    
     required string fullpath=1;
     required uint32 mod=2;
     optional Volume volume=3;
 }
 
 message NewVolume_Response {
-    optional uint32 token=100;
     optional string error=101;
 }
 
 message ChMod_Request {
-    optional uint32 token=100;
     required string fullpath=1;
     required uint32 mod=2;
 }
 
 message ChMod_Response {
-    optional uint32 token=100;
     optional string error=101;
 }
 
 //also used to "assemble" (active) a single chunk
 message AssembleVolume_Request {
-    optional uint32 token=100;
     required Volume volume=1;
 }
 
 message AssembleVolume_Response {
-    optional uint32 token=100;
     required string access_point=1;
     repeated string APs=2;               // all the access points, if results in more than one.
     optional string error=101;
 }
 
 message DisassembleVolume_Request {
-    optional uint32 token=100;
     required string access_point=1;
 }
 
 message DisassembleVolume_Response {
-    optional uint32 token=100;
     required string access_point=1;
     optional string error=101;
 }
@@ -215,13 +199,11 @@ message RepairVolume_Response {
 }
 
 message MoveVolume_Request {
-    optional uint32 token=100;
     required string volume=1;
     required string destination=2;
 }
 
 message MoveVolume_Response {
-    optional uint32 token=100;
     optional string error=101;
 }
 
@@ -231,33 +213,30 @@ message DeleteVolume_Request {
 }
 
 message DeleteVolume_Response {
-    optional uint32 token=100;
     optional string error=101;
 }
 
 message CreateLink_Request {
-    optional uint32 token=100;
     required string destination=1;
     required string link=2;
 }
 
 message CreateLink_Response {
-    optional uint32 token=100;
     optional string error=101;
 }
 
 
 service MDSService {
-    rpc NewChunk(NewChunk_Request) returns (NewChunk_Response);
-    rpc DeleteChunk(DeleteChunk_Request) returns (DeleteChunk_Response);
-    rpc NewVolume(NewVolume_Request) returns(NewVolume_Response);
-    rpc AssembleVolume(AssembleVolume_Request) returns (AssembleVolume_Response);
+    rpc NewChunk(NewChunk_Request)                   returns (NewChunk_Response);
+    rpc DeleteChunk(DeleteChunk_Request)             returns (DeleteChunk_Response);
+    rpc NewVolume(NewVolume_Request)                 returns(NewVolume_Response);
+    rpc AssembleVolume(AssembleVolume_Request)       returns (AssembleVolume_Response);
     rpc DisassembleVolume(DisassembleVolume_Request) returns (DisassembleVolume_Response);
-    rpc RepairVolume(RepairVolume_Request) returns (RepairVolume_Response);
-    rpc ReadVolume(ReadVolume_Request) returns(ReadVolume_Response);
-    rpc WriteVolume(WriteVolume_Request) returns(WriteVolume_Response);
-    rpc MoveVolume(MoveVolume_Request) returns(MoveVolume_Response);
-    rpc ChMod(ChMod_Request) returns(ChMod_Response);
-    rpc DeleteVolume(DeleteVolume_Request) returns(DeleteVolume_Response);
-    rpc CreateLinK(CreateLink_Request) returns(CreateLink_Response);
+    rpc RepairVolume(RepairVolume_Request)           returns (RepairVolume_Response);
+    rpc ReadVolume(ReadVolume_Request)               returns(ReadVolume_Response);
+    rpc WriteVolume(WriteVolume_Request)             returns(WriteVolume_Response);
+    rpc MoveVolume(MoveVolume_Request)               returns(MoveVolume_Response);
+    rpc ChMod(ChMod_Request)                         returns(ChMod_Response);
+    rpc DeleteVolume(DeleteVolume_Request)           returns(DeleteVolume_Response);
+    rpc CreateLinK(CreateLink_Request)               returns(CreateLink_Response);
 }
