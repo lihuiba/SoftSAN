@@ -1,8 +1,23 @@
+option py_generic_services = false;
+
 message Guid {
     required fixed32 a=1;
     required fixed32 b=2;
     required fixed32 c=3;
     required fixed32 d=4;
+}
+
+message Request {
+    required uint32 token=1;
+    required Guid caller=2
+    required string method=3;
+    required bytes argument=4;
+}
+
+message Response {
+    required uint32 token=1;
+    required uint32 errorno=2;
+    required bytes ret=3;
 }
 
 message ChunkInfo {
@@ -92,7 +107,6 @@ message ChunkServerInfo {
 }
 
 message NewChunk_Request {
-    optional uint32 token=100;
     required uint32 size=1;       //in MB
     optional Guid location=2;     //can be server guid or disk guid
 }

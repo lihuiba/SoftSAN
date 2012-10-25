@@ -25,7 +25,7 @@ def AttachCatcher(obj, functions=None):
 		f=cdict[func]
 		if not inspect.isfunction(f):
 			continue
-		print "Wrapping ", func
+		logging.debug("Wrapping "+func)
 		wrapper=GetWrapper(obj, f)
 		obj.__dict__[func]=wrapper
 	return obj
