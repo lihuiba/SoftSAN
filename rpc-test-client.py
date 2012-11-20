@@ -1,14 +1,15 @@
-import redis, rpc
+import redis, rpc, logging
 import messages_pb2 as msg
 import mds_mock
 
-server=mds_mock.MDS()
+logging.basicConfig(level=logging.DEBUG)
+
 guid=msg.Guid()
 guid.a=10
 guid.b=22
 guid.c=30
 guid.d=40
-stub=rpc.RpcStub(server, guid)
+stub=rpc.RpcStub(guid, mds_mock.MDS)
 
 arg=msg.NewChunk_Request()
 arg.size=32

@@ -68,7 +68,7 @@ class RpcService:
 		global CHANNEL_MDS
 		self.rclient.subscribe(CHANNEL_MDS)
 		for message in self.rclient.listen():
-			print message
+			logging.debug(message)
 			mtype=message['type']
 			mdata=message['data']
 			if mtype=='subscribe': 
@@ -94,21 +94,24 @@ class RpcService:
 
 class RpcStub:
 	token=0;
-	theServer=None
 	methodInfo=None
 	rclient=None
 	rclient_pub=None
 	guid=None
 	callWindow={}
-	def __init__(self, MDSServer, guid, MethodInfo=None):
+	def __init__(self, guid, Interface=None, MethodInfo=None):
+		if Interface==None and MethodInfo==None:
+			raise ValueError("At least provide a Interface or a MethodInfo")
 		self.guid=guid
 		self.rclient_pub=redis.client.Redis()
 		self.rclient=redis.client.Redis()
 		self.myChannel=CHANNEL_Client(guid)
 		self.rclient.subscribe(self.myChannel)
-		self.theServer=MDSServer
-		self.methodInfo=MethodInfo or BuildMethodInfo(MDSServer)
-		logging.info(self.methodInfo)
+		if isinstance(MethodInfo, dict):  #if it's MethodInfo
+			self.methodInfo=MethodInfo
+		else:
+			self.methodInfo=BuildMethodInfo(Interface)
+		logging.info(self.methodInfo.keys())
 
 	#request must be an instance of msg.Request
 	def callMethod_async(self, method, argument, done=None):
@@ -130,7 +133,7 @@ class RpcStub:
 
 	def wait(self):
 		for message in self.rclient.listen():
-			print message
+			logging.debug(message)
 			mtype=message['type']
 			mdata=message['data']
 			if mtype=='subscribe': 
