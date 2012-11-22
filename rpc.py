@@ -1,6 +1,7 @@
 import redis, inspect, logging
 import messages_pb2 as msg
 from greenlet import greenlet
+import time
 
 # MethodInfo={
 #	"NewChunk":         (msg.NewChunk_Request,          msg.NewChunk_Response),
@@ -124,7 +125,10 @@ class RpcServiceCo(RpcService):
 		RpcService.__init__(self, MDSServer, MethodInfo)
 	def processRequest(self, request):
 		def starter():
-			RpcService.processRequest(self, request)
+			try:
+				RpcService.processRequest(self, request)
+			except:
+				pass
 			self.sched.prepareDie()
 		self.sched.createThread(starter)
 		logging.debug("RpcServiceCo: service thread created")
@@ -266,16 +270,27 @@ class RpcStubCo(RpcStub):
 class Scheduler:
 	activeq=[]		# activeq[0] will always be the current thread
 	suspendq=[]
+	timing={}
 	def __init__(self):
 		current=greenlet.getcurrent()
 		self.activeq.append(current)
 	@staticmethod
 	def getCurrent():
-		return greenlet.getcurrent()
+		th=greenlet.getcurrent()
+		return th
 	def createThread(self, func):
 		th=greenlet(func)
 		self.activeq.append(th)
+		self.timing[th]=time.time()
 		return th
+	def clearTimeoutThreads(self, maxLife=None):
+		if maxLife==None:
+			maxLife=30 #seconds
+		now=time.time()
+		for th in self.timing:
+			age=now-self.timing[th]
+			if age>maxLife:
+				th.throw()
 	def active(self, thread):
 		if thread in self.activeq:
 			return
@@ -283,7 +298,6 @@ class Scheduler:
 		self.activeq.append(thread)
 		self.suspendq.remove(thread)
 	def suspend(self, thread=None):
-		print 1
 		if thread in self.suspendq:
 			return
 		current=self.activeq[0]
@@ -297,6 +311,7 @@ class Scheduler:
 	def prepareDie(self):
 		th=self.activeq.pop(0)
 		th.parent=self.activeq[0]
+		del self.timing[th]
 		logging.debug("preparing to die")
 	def switch(self):
 		c=self.activeq.pop(0)

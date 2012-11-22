@@ -6,19 +6,6 @@ message Guid {
     required fixed32 d=4;
 }
 
-//message Request {
-//    required uint32 token=1;
-//    required Guid caller=2;
-//    required string method=3;
-//    required bytes argument=4;
-//}
-
-//message Response {
-//    required uint32 token=1;
-//   required uint32 errorno=2;
-//    required bytes ret=3;
-//}
-
 message Header {
     required uint32 token=1;
     required Guid caller=2;      // the initial caller
