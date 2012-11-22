@@ -6,17 +6,27 @@ message Guid {
     required fixed32 d=4;
 }
 
-message Request {
-    required uint32 token=1;
-    required Guid caller=2;
-    required string method=3;
-    required bytes argument=4;
-}
+//message Request {
+//    required uint32 token=1;
+//    required Guid caller=2;
+//    required string method=3;
+//    required bytes argument=4;
+//}
 
-message Response {
+//message Response {
+//    required uint32 token=1;
+//   required uint32 errorno=2;
+//    required bytes ret=3;
+//}
+
+message Header {
     required uint32 token=1;
-    required uint32 errorno=2;
-    required bytes ret=3;
+    required Guid caller=2;      // the initial caller
+    required bool isRequest=3;
+    optional string method=4;
+    optional bytes argument=5;
+    optional bytes ret=6;
+    optional uint32 errorno=7;
 }
 
 message ChunkInfo {
@@ -106,13 +116,13 @@ message ChunkServerInfo {
 }
 
 message NewChunk_Request {
-    required uint32 size=1;       //in MB
-    optional Guid location=2;     //can be server guid or disk guid
+    required uint32 size=1;                 //in MB
+    optional Guid location=2;               //target server guid, or (0,0,0,0) for any location
 }
 
 message NewChunk_Response {
-    required uint32 size=1;
-    required Guid guid=2;
+    required uint32 size=1;                 //size of the created chunk
+    required Guid guid=2;                   //guid of the created chunk
     optional string error=101;
 }
 

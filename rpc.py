@@ -1,5 +1,6 @@
 import redis, inspect, logging
 import messages_pb2 as msg
+from greenlet import greenlet
 
 # MethodInfo={
 #	"NewChunk":         (msg.NewChunk_Request,          msg.NewChunk_Response),
@@ -22,6 +23,8 @@ CHANNEL_MDS=CHANNEL+'.MDS'
 
 def CHANNEL_Client(guid):
 	global CHANNEL
+	if guid==None or (guid.a==0 and guid.b==0 and guid.c==0 and guid.d==0):
+		return CHANNEL_MDS
 	client="{0}.{1}.{2}.{3}.{4}".format(CHANNEL, \
 		guid.a, guid.b, guid.c, guid.d)
 	return client
@@ -39,6 +42,9 @@ def BuildMethodInfo(theServer):
 		# 	print func, req, res
 	return ret
 
+class ServiceTerminated:
+	pass
+
 class RpcService:
 	theServer=None
 	methodInfo=None
@@ -51,7 +57,7 @@ class RpcService:
 		self.methodInfo=MethodInfo or BuildMethodInfo(MDSServer)
 		logging.info(self.methodInfo)
 
-	#request must be an instance of msg.Request
+	#request must be an instance of msg.Header in the request form
 	def callMethod(self, request):
 		methodname=request.method
 		argument=self.methodInfo[methodname][0]()
@@ -64,33 +70,92 @@ class RpcService:
 				format(methodname, rettype, type(ret)))
 		return ret
 
-	def listen(self):
-		global CHANNEL_MDS
-		self.rclient.subscribe(CHANNEL_MDS)
-		for message in self.rclient.listen():
+	def doListen(self):
+		return self.rclient.listen()
+
+	def listen(self, channelGuid=None):
+		CHANNEL=CHANNEL_Client(channelGuid)			# CHANNEL_MDS, if channelGuid is None
+		self.rclient.subscribe(CHANNEL)
+		logging.info("subscribed to channel '%s'", CHANNEL)
+		for message in self.doListen():	
 			logging.debug(message)
 			mtype=message['type']
 			mdata=message['data']
 			if mtype=='subscribe': 
 				continue
 			elif mtype=='unsubscribe':
-				break
-			elif mtype!='message' or message['channel']!=CHANNEL_MDS:
-				assert False, "should receive messages from channel '{0}'".format(CHANNEL_MDS)
+				raise ServiceTerminated()
+			elif mtype!='message' or message['channel']!=CHANNEL:
+				assert False, "should receive messages from channel '{0}'".format(CHANNEL)
 				continue
 			elif not isinstance(mdata, str):
 				assert False, "type of message data should be str!"
 				continue
-			request=msg.Request.FromString(mdata)
-			
-			ret=self.callMethod(request)
-			
-			response=msg.Response()
-			response.token=request.token
-			response.errorno=0
-			response.ret=ret.SerializeToString()
-			caller=CHANNEL_Client(request.caller)
-			self.rclient_pub.publish(caller, response.SerializeToString())
+			header=msg.Header.FromString(mdata)
+			if header.isRequest:
+				self.processRequest(header)
+			else:
+				self.processResponse(header)
+
+	def processRequest(self, request):
+		logging.debug("RpcServiceCo: processRequest")
+		ret=self.callMethod(request)
+		response=msg.Header()
+		response.token=request.token
+		response.caller.a=request.caller.a
+		response.caller.b=request.caller.b
+		response.caller.c=request.caller.c
+		response.caller.d=request.caller.d
+		response.errorno=0
+		response.isRequest=False
+		response.ret=ret.SerializeToString()
+		caller=CHANNEL_Client(request.caller)
+		logging.debug("replying to %s", caller)
+		self.rclient_pub.publish(caller, response.SerializeToString())
+
+	def processResponse(self, response):
+		raise NotImplementedError("RpcService doesn't process call responses!")
+
+
+class RpcServiceCo(RpcService):
+	sched=None
+	def __init__(self, scheduler, MDSServer, MethodInfo=None):
+		self.sched=scheduler
+		RpcService.__init__(self, MDSServer, MethodInfo)
+	def processRequest(self, request):
+		def starter():
+			RpcService.processRequest(self, request)
+			self.sched.prepareDie()
+		self.sched.createThread(starter)
+		logging.debug("RpcServiceCo: service thread created")
+	def doListen(self):
+		#return self.sched.doListen(self.rclient)
+		for msg in self.rclient.listen():
+			yield msg
+			print "RpcServiceCo.doListen"
+			logging.debug("thread count: %d", len(self.sched.activeq))
+			while len(self.sched.activeq)>1:
+				self.sched.switch()
+	responseRegistry={}
+	@staticmethod
+	def getKey(h):
+		return (h.token, h.caller.a, h.caller.b, h.caller.c, h.caller.d)		
+	def processResponse(self, response):
+		key=self.getKey(response)
+		print "processResponse: ", key
+		if not key in self.responseRegistry:
+			raise "session not found in the registry!"
+		record=self.responseRegistry[key]
+		del self.responseRegistry[key]
+		record[4]=response
+		th=record[3]
+		self.sched.active(th)
+	def registerResponse(self, record):
+		key=self.getKey(record[0])
+		record[3]=Scheduler.getCurrent()
+		self.responseRegistry[key]=record
+		print "registered session: ", key
+
 
 class RpcStub:
 	token=0;
@@ -99,6 +164,7 @@ class RpcStub:
 	rclient_pub=None
 	guid=None
 	callWindow={}
+	callee=None
 	def __init__(self, guid, Interface=None, MethodInfo=None):
 		if Interface==None and MethodInfo==None:
 			raise ValueError("At least provide a Interface or a MethodInfo")
@@ -107,18 +173,21 @@ class RpcStub:
 		self.rclient=redis.client.Redis()
 		self.myChannel=CHANNEL_Client(guid)
 		self.rclient.subscribe(self.myChannel)
-		if isinstance(MethodInfo, dict):  #if it's MethodInfo
+		self.callee=CHANNEL_MDS				#default callee
+		if isinstance(MethodInfo, dict):    #if it's MethodInfo
 			self.methodInfo=MethodInfo
 		else:
 			self.methodInfo=BuildMethodInfo(Interface)
 		logging.info(self.methodInfo.keys())
 
-	#request must be an instance of msg.Request
+	def setCallee(self, guid):
+		self.callee=CHANNEL_Client(guid)
+
 	def callMethod_async(self, method, argument, done=None):
-		global CHANNEL_MDS
-		req=msg.Request()
+		req=msg.Header()
 		req.token=self.token
 		self.token=self.token+1
+		req.isRequest=True;
 		req.method=method
 		req.caller.a=self.guid.a
 		req.caller.b=self.guid.b
@@ -126,12 +195,23 @@ class RpcStub:
 		req.caller.d=self.guid.d
 		req.argument=argument.SerializeToString()
 		data=req.SerializeToString()
-		self.rclient_pub.publish(CHANNEL_MDS, data)
-		record=(req, argument, done)
+		logging.debug("calling %s", self.callee)
+		self.rclient_pub.publish(self.callee, data)
+		record=[req, argument, done, None, None]		# the two Nones will be current thread and response
 		self.callWindow[req.token]=record
 		return record
 
-	def wait(self):
+	def bottom_half(self, response):
+		record=self.callWindow[response.token]
+		methodName=record[0].method
+		responseType=self.methodInfo[methodName][1]
+		ret=responseType.FromString(response.ret)
+		del self.callWindow[response.token]
+		done=record[2]
+		if done: done(ret)
+		return record, ret
+
+	def doMessage(self):
 		for message in self.rclient.listen():
 			logging.debug(message)
 			mtype=message['type']
@@ -139,28 +219,97 @@ class RpcStub:
 			if mtype=='subscribe': 
 				continue
 			elif mtype=='unsubscribe':
-				break
+				return
 			elif mtype!='message' or message['channel']!=self.myChannel:
 				assert False, "should receive messages from channel '{0}'".format(self.myChannel)
 				continue
 			elif not isinstance(mdata, str):
 				assert False, "type of message data should be str!"
 				continue
-			res=msg.Response.FromString(mdata)
-			record=self.callWindow[res.token]
-			responseType=self.methodInfo[record[0].method][1]
-			ret=responseType.FromString(res.ret)
-			del self.callWindow[res.token]
-			done=record[2]
-			if done: done(ret)
-			return record, ret
+			response=msg.Header.FromString(mdata)
+			return self.bottom_half(response)
 
 	def callMethod(self, method, argument):
 		record0=self.callMethod_async(method, argument)
 		while True:
-			record1,ret = self.wait()
+			record1,ret = self.doMessage()
 			if record0==record1:
 				return ret
+
+class RpcStubCo(RpcStub):
+	sched=None
+	serviceCo=None
+	def __init__(self, guid, scheduler, Interface=None, MethodInfo=None):
+		RpcStub.__init__(self, guid, Interface, MethodInfo)
+		self.sched=scheduler
+	def resume(self, thread, ret, retv):
+		print "retv: ", retv
+		ret[0]=retv
+		self.sched.active(thread)
+	def callMethod(self, method, argument):
+		ret=[0,]
+		current=greenlet.getcurrent()
+		done = lambda retv : self.resume(current, ret, retv)
+		record=self.callMethod_async(method, argument, done)
+		if self.serviceCo:
+			self.serviceCo.registerResponse(record)		
+		self.sched.suspend(current)
+
+		# here, when get resumed, record[4] will be response
+		response=record[4]
+		self.bottom_half(response)
+		return ret[0]
+	def setServiceCo(self, service):
+		self.serviceCo=service
+
+
+class Scheduler:
+	activeq=[]		# activeq[0] will always be the current thread
+	suspendq=[]
+	def __init__(self):
+		current=greenlet.getcurrent()
+		self.activeq.append(current)
+	@staticmethod
+	def getCurrent():
+		return greenlet.getcurrent()
+	def createThread(self, func):
+		th=greenlet(func)
+		self.activeq.append(th)
+		return th
+	def active(self, thread):
+		if thread in self.activeq:
+			return
+		logging.debug("activing %d", hash(thread))
+		self.activeq.append(thread)
+		self.suspendq.remove(thread)
+	def suspend(self, thread=None):
+		print 1
+		if thread in self.suspendq:
+			return
+		current=self.activeq[0]
+		if thread==None:
+			thread=current
+		logging.debug("suspending %d", hash(thread))
+		self.activeq.remove(thread)
+		self.suspendq.append(thread)
+		if thread==current:
+			self.activeq[0].switch()
+	def prepareDie(self):
+		th=self.activeq.pop(0)
+		th.parent=self.activeq[0]
+		logging.debug("preparing to die")
+	def switch(self):
+		c=self.activeq.pop(0)
+		self.activeq.append(c)
+		self.activeq[0].switch()
+	def doListen(self, r):
+		for msg in r.listen():
+			print "Scheduler.doListen"
+			logging.debug("thread count: %d", len(self.activeq))
+			while len(self.activeq)>1:
+				self.switch()
+			yield msg
+			
 
 
 ###################### Test ####################################

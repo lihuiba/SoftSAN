@@ -1,15 +1,20 @@
+import rpc
 import messages_pb2 as msg
 
 class MDS:
+	stub=None
+	def __init__(self, stub):
+		self.stub=stub
 	def NewChunk(self, arg):
 		print type(arg)
-		ret=msg.NewChunk_Response()
-		ret.size=arg.size
-		ret.guid.a=0
-		ret.guid.b=1
-		ret.guid.c=2
-		ret.guid.d=3
-		return ret
+		x=arg.location
+		if x.a==0 and x.b==0 and x.c==0 and x.d==0:
+			x.a=9; x.b=8; x.c=7; x.d=6;
+		self.stub.setCallee(x)
+		print "Relay NewChunk to 9.8.7.6"
+		ret0=self.stub.callMethod("NewChunk", arg)
+		print "Got response from 9.8.7.6:", ret0
+		return ret0
 	def DeleteChunk(self, arg):
 		print type(arg)
 		ret=msg.DeleteChunk_Response()
@@ -61,3 +66,5 @@ class MDS:
 		print type(arg)
 		ret=msg.CreateLink_Response()
 		return ret
+
+
