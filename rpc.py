@@ -1,7 +1,7 @@
 import redis, inspect, logging
 import messages_pb2 as msg
 from greenlet import greenlet
-import time
+import time, collections
 
 # MethodInfo={
 #	"NewChunk":         (msg.NewChunk_Request,          msg.NewChunk_Response),
@@ -43,6 +43,8 @@ def BuildMethodInfo(theServer):
 
 class ServiceTerminated:
 	pass
+class ServiceTimeout:
+	pass
 
 class RpcService:
 	theServer=None
@@ -64,7 +66,7 @@ class RpcService:
 		method=getattr(self.theServer, methodname)
 		ret=method(argument)
 		rettype=self.methodInfo[methodname][1]
-		if ret!=None and not isinstance(ret, rettype):
+		if not isinstance(ret, rettype):
 			raise TypeError('return value of {0} is supposed to be {1}, but in fact {2}'. \
 				format(methodname, rettype, type(ret)))
 		return ret
@@ -73,15 +75,22 @@ class RpcService:
 		return self.rclient.listen()
 
 	def listen(self, channelGuids=None):
-		if channelGuid==None:
+		channels=None
+		if channelGuids==None:
 			self.rclient.subscribe(CHANNEL_MDS)
 			self.rclient.subscribe(CHANNEL_HEARTBEAT)
-			logging.info("subscribed to channel '%s' and '%s'.", CHANNEL_MDS, CHANNEL_HEARTBEAT)
+			channels=(CHANNEL_MDS, CHANNEL_HEARTBEAT)
+			logging.info("subscribed to channel %s.", channels)
 		else:
+			channels=[]
+			if not isinstance(channelGuids, collections.Iterable):
+				channelGuids=(channelGuids,)
 			for guid in channelGuids:
 				channel=CHANNEL_fromGuid(guid)
 				self.rclient.subscribe(channel)	
+				channels.append(channel)
 				logging.info("subscribed to channel '%s'", channel)
+
 		for message in self.doListen():	
 			logging.debug(message)
 			mtype=message['type']
@@ -90,8 +99,8 @@ class RpcService:
 				continue
 			elif mtype=='unsubscribe':
 				raise ServiceTerminated()
-			elif mtype!='message' or message['channel']!=CHANNEL:
-				assert False, "should receive messages from channel '{0}'".format(CHANNEL)
+			elif mtype!='message' or not (message['channel'] in channels):
+				assert False, "should receive messages from channels '{0}'".format(channels)
 				continue
 			elif not isinstance(mdata, str):
 				assert False, "type of message data should be str!"
@@ -120,7 +129,7 @@ class RpcService:
 			self.rclient_pub.publish(caller, response.SerializeToString())
 
 	def processResponse(self, response):
-		raise NotImplementedError("RpcService doesn't process call responses!")
+		raise NotImplementedError("RpcService doesn't process responses!")
 
 
 class RpcServiceCo(RpcService):
@@ -141,29 +150,29 @@ class RpcServiceCo(RpcService):
 		#return self.sched.doListen(self.rclient)
 		for msg in self.rclient.listen():
 			yield msg
-			print "RpcServiceCo.doListen"
-			logging.debug("thread count: %d", len(self.sched.activeq))
+			logging.debug("RpcServiceCo.doListen, thread count: %d", len(self.sched.activeq))
 			while len(self.sched.activeq)>1:
 				self.sched.switch()
 	responseRegistry={}
 	@staticmethod
-	def getKey(h):
+	def makeKey(h):
 		return (h.token, h.caller.a, h.caller.b, h.caller.c, h.caller.d)		
 	def processResponse(self, response):
-		key=self.getKey(response)
-		print "processResponse: ", key
+		key=self.makeKey(response)
+		logging.debug("processResponse: %s", key)
 		if not key in self.responseRegistry:
-			raise "session not found in the registry!"
+			debug.info("session not found in the registry! (%s)", key)
+			return
 		record=self.responseRegistry[key]
 		del self.responseRegistry[key]
 		record[4]=response
 		th=record[3]
 		self.sched.active(th)
 	def registerResponse(self, record):
-		key=self.getKey(record[0])
+		key=self.makeKey(record[0])
 		record[3]=Scheduler.getCurrent()
 		self.responseRegistry[key]=record
-		print "registered session: ", key
+		logging.debug("registered session: %s", key)
 
 
 class RpcStub:
@@ -188,7 +197,6 @@ class RpcStub:
 		else:
 			self.methodInfo=BuildMethodInfo(Interface)
 		logging.info(self.methodInfo.keys())
-
 	def setCallee(self, guid):
 		self.callee=CHANNEL_fromGuid(guid)
 
@@ -209,7 +217,6 @@ class RpcStub:
 		record=[req, argument, done, None, None]		# the two Nones will be current thread and response
 		self.callWindow[req.token]=record
 		return record
-
 	def bottom_half(self, response):
 		record=self.callWindow[response.token]
 		methodName=record[0].method
@@ -219,7 +226,6 @@ class RpcStub:
 		done=record[2]
 		if done: done(ret)
 		return record, ret
-
 	def doMessage(self):
 		for message in self.rclient.listen():
 			logging.debug(message)
@@ -237,13 +243,15 @@ class RpcStub:
 				continue
 			response=msg.Header.FromString(mdata)
 			return self.bottom_half(response)
-
 	def callMethod(self, method, argument):
 		record0=self.callMethod_async(method, argument)
 		while True:
 			record1,ret = self.doMessage()
 			if record0==record1:
 				return ret
+	def callMethod_callee(self, method, argument, callee):
+		self.setCallee(callee)
+		self.callMethod(method, argument)
 
 class RpcStubCo(RpcStub):
 	sched=None
@@ -252,7 +260,7 @@ class RpcStubCo(RpcStub):
 		RpcStub.__init__(self, guid, Interface, MethodInfo)
 		self.sched=scheduler
 	def resume(self, thread, ret, retv):
-		print "retv: ", retv
+		logging.debug("return value: %s", retv)
 		ret[0]=retv
 		self.sched.active(thread)
 	def callMethod(self, method, argument):
@@ -317,15 +325,14 @@ class Scheduler:
 		th=self.activeq.pop(0)
 		th.parent=self.activeq[0]
 		del self.timing[th]
-		logging.debug("preparing to die")
+		logging.debug("preparing thread %d to die.", hash(th))
 	def switch(self):
 		c=self.activeq.pop(0)
 		self.activeq.append(c)
 		self.activeq[0].switch()
 	def doListen(self, r):
 		for msg in r.listen():
-			print "Scheduler.doListen"
-			logging.debug("thread count: %d", len(self.activeq))
+			logging.debug("Scheduler.doListen, thread count: %d", len(self.activeq))
 			while len(self.activeq)>1:
 				self.switch()
 			yield msg

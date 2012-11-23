@@ -12,6 +12,6 @@ server=mds_mock.MDS(stub)
 service=rpc.RpcServiceCo(sched, server)
 stub.setServiceCo(service)
 while True:
-	print 1
 	service.listen()
+	print "let's listen again"
 
