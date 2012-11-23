@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from lvm import LVM
+from my_lvm import my_LVM
 
 def help():
 	print 'your command should be as follow:'
@@ -11,7 +11,7 @@ def help():
 
 
 def test_lvm():
-	lvm = LVM()
+	lvm = my_LVM()
 	lvm.load()
 	lvm.print_out()
 	print '<<<<<<<<<<<<   Welcome to lvm controllor  >>>>>>>>>>>>>'
@@ -44,10 +44,8 @@ def test_lvm():
 			print '---------   input error!   ----------'
 			print 
 			help()
-		
 		print ''
 		print ''
-	print '<<<<<<<<<<<<   see you   >>>>>>>>>>>>>'
 
 if __name__ == '__main__':
 	test_lvm()
