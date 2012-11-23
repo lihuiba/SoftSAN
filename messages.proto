@@ -114,12 +114,12 @@ message NewChunk_Response {
 }
 
 message DeleteChunk_Request {
-    required Guid guid=1;
+    required Guid guids=1;                   //array of guids of the chunks to delete
 }
 
 message DeleteChunk_Response {
-    required Guid guid=1;
-    optional string error=101;
+    required Guid guids=1;                  //array of guids of the chunks that has been deleted
+    optional string error=101;              //error code that describes why some chunks are not deleted, if any
 }
 
 message Volume {

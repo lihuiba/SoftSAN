@@ -10,9 +10,8 @@ class MDS:
 		x=arg.location
 		if x.a==0 and x.b==0 and x.c==0 and x.d==0:
 			x.a=9; x.b=8; x.c=7; x.d=6;
-		self.stub.setCallee(x)
 		print "Relay NewChunk to 9.8.7.6"
-		ret0=self.stub.callMethod("NewChunk", arg)
+		ret0=self.stub.callMethod_callee("NewChunk", arg, x)
 		print "Got response from 9.8.7.6:", ret0
 		return ret0
 	def DeleteChunk(self, arg):

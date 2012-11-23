@@ -249,7 +249,7 @@ class RpcStub:
 			record1,ret = self.doMessage()
 			if record0==record1:
 				return ret
-	def callMethod_callee(self, method, argument, callee):
+	def callMethod_on(self, method, argument, callee):
 		self.setCallee(callee)
 		self.callMethod(method, argument)
 
