@@ -21,8 +21,9 @@ import time
 
 CHANNEL='SoftSAN.RPC.0'
 CHANNEL_MDS=CHANNEL+'.MDS'
+CHANNEL_HEARTBEAT=CHANNEL+'.heartbeat'
 
-def CHANNEL_Client(guid):
+def CHANNEL_fromGuid(guid):
 	global CHANNEL
 	if guid==None or (guid.a==0 and guid.b==0 and guid.c==0 and guid.d==0):
 		return CHANNEL_MDS
@@ -35,12 +36,9 @@ def BuildMethodInfo(theServer):
 	for func in dir(theServer):
 		if func.startswith('__'):
 			continue
-		req=getattr(msg, func+'_Request', None)
-		res=getattr(msg, func+'_Response', None)
-		if inspect.isclass(req) and inspect.isclass(res):
-			ret[func]=(req, res)
-		# else:
-		# 	print func, req, res
+		req=getattr(msg, func+'_Request', type(None))
+		res=getattr(msg, func+'_Response', type(None))
+		ret[func]=(req, res)
 	return ret
 
 class ServiceTerminated:
@@ -66,18 +64,24 @@ class RpcService:
 		method=getattr(self.theServer, methodname)
 		ret=method(argument)
 		rettype=self.methodInfo[methodname][1]
-		if not isinstance(ret, rettype):
-			raise TypeError('return value of {0} is supposed to be {1}, but in facet {2}'. \
+		if ret!=None and not isinstance(ret, rettype):
+			raise TypeError('return value of {0} is supposed to be {1}, but in fact {2}'. \
 				format(methodname, rettype, type(ret)))
 		return ret
 
 	def doListen(self):
 		return self.rclient.listen()
 
-	def listen(self, channelGuid=None):
-		CHANNEL=CHANNEL_Client(channelGuid)			# CHANNEL_MDS, if channelGuid is None
-		self.rclient.subscribe(CHANNEL)
-		logging.info("subscribed to channel '%s'", CHANNEL)
+	def listen(self, channelGuids=None):
+		if channelGuid==None:
+			self.rclient.subscribe(CHANNEL_MDS)
+			self.rclient.subscribe(CHANNEL_HEARTBEAT)
+			logging.info("subscribed to channel '%s' and '%s'.", CHANNEL_MDS, CHANNEL_HEARTBEAT)
+		else:
+			for guid in channelGuids:
+				channel=CHANNEL_fromGuid(guid)
+				self.rclient.subscribe(channel)	
+				logging.info("subscribed to channel '%s'", channel)
 		for message in self.doListen():	
 			logging.debug(message)
 			mtype=message['type']
@@ -101,18 +105,19 @@ class RpcService:
 	def processRequest(self, request):
 		logging.debug("RpcServiceCo: processRequest")
 		ret=self.callMethod(request)
-		response=msg.Header()
-		response.token=request.token
-		response.caller.a=request.caller.a
-		response.caller.b=request.caller.b
-		response.caller.c=request.caller.c
-		response.caller.d=request.caller.d
-		response.errorno=0
-		response.isRequest=False
-		response.ret=ret.SerializeToString()
-		caller=CHANNEL_Client(request.caller)
-		logging.debug("replying to %s", caller)
-		self.rclient_pub.publish(caller, response.SerializeToString())
+		if ret!=None:
+			response=msg.Header()
+			response.token=request.token
+			response.caller.a=request.caller.a
+			response.caller.b=request.caller.b
+			response.caller.c=request.caller.c
+			response.caller.d=request.caller.d
+			response.errorno=0
+			response.isRequest=False
+			response.ret=ret.SerializeToString()
+			caller=CHANNEL_fromGuid(request.caller)
+			logging.debug("replying to %s", caller)
+			self.rclient_pub.publish(caller, response.SerializeToString())
 
 	def processResponse(self, response):
 		raise NotImplementedError("RpcService doesn't process call responses!")
@@ -175,7 +180,7 @@ class RpcStub:
 		self.guid=guid
 		self.rclient_pub=redis.client.Redis()
 		self.rclient=redis.client.Redis()
-		self.myChannel=CHANNEL_Client(guid)
+		self.myChannel=CHANNEL_fromGuid(guid)
 		self.rclient.subscribe(self.myChannel)
 		self.callee=CHANNEL_MDS				#default callee
 		if isinstance(MethodInfo, dict):    #if it's MethodInfo
@@ -185,7 +190,7 @@ class RpcStub:
 		logging.info(self.methodInfo.keys())
 
 	def setCallee(self, guid):
-		self.callee=CHANNEL_Client(guid)
+		self.callee=CHANNEL_fromGuid(guid)
 
 	def callMethod_async(self, method, argument, done=None):
 		req=msg.Header()
