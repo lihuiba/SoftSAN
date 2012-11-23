@@ -36,8 +36,8 @@ def BuildMethodInfo(theServer):
 	for func in dir(theServer):
 		if func.startswith('__'):
 			continue
-		req=getattr(msg, func+'_Request', type(None))
-		res=getattr(msg, func+'_Response', type(None))
+		req=getattr(msg, func+'_Request', None) or getattr(msg, func, type(None))
+		res=getattr(msg, func+'_Response', None)
 		ret[func]=(req, res)
 	return ret
 

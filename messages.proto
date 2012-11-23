@@ -19,7 +19,7 @@ message Header {
 message ChunkInfo {
     required Guid guid=1;
     required uint32 size=2;    //in MB
-//    optional uint32 reside_on_disk=3;
+    optional uint32 reside_on_disk=3;
 }
 
 message SMARTInfo {
