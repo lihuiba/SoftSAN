@@ -6,23 +6,20 @@ message Guid {
     required fixed32 d=4;
 }
 
-message Request {
+message Header {
     required uint32 token=1;
-    required Guid caller=2;
-    required string method=3;
-    required bytes argument=4;
-}
-
-message Response {
-    required uint32 token=1;
-    required uint32 errorno=2;
-    required bytes ret=3;
+    required Guid caller=2;      // the initial caller
+    required bool isRequest=3;
+    optional string method=4;
+    optional bytes argument=5;
+    optional bytes ret=6;
+    optional uint32 errorno=7;
 }
 
 message ChunkInfo {
     required Guid guid=1;
     required uint32 size=2;    //in MB
-//    optional uint32 reside_on_disk=3;
+    optional uint32 reside_on_disk=3;
 }
 
 message SMARTInfo {
@@ -106,23 +103,23 @@ message ChunkServerInfo {
 }
 
 message NewChunk_Request {
-    required uint32 size=1;       //in MB
-    optional Guid location=2;     //can be server guid or disk guid
+    required uint32 size=1;                 //in MB
+    optional Guid location=2;               //target server guid, or (0,0,0,0) for any location
 }
 
 message NewChunk_Response {
-    required uint32 size=1;
-    required Guid guid=2;
+    required uint32 size=1;                 //size of the created chunk
+    required Guid guid=2;                   //guid of the created chunk
     optional string error=101;
 }
 
 message DeleteChunk_Request {
-    required Guid guid=1;
+    required Guid guids=1;                   //array of guids of the chunks to delete
 }
 
 message DeleteChunk_Response {
-    required Guid guid=1;
-    optional string error=101;
+    required Guid guids=1;                  //array of guids of the chunks that has been deleted
+    optional string error=101;              //error code that describes why some chunks are not deleted, if any
 }
 
 message Volume {
