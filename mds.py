@@ -19,67 +19,84 @@ def guidFromStr(s):
     ret.d=int(s[3], 16)
     return ret
 
+def container(x):
+    if hasattr(x, '__iter__') or hasattr(x, '__getitem__'):
+        return x
+    else:
+        return (x,)
+
+def uncontainer(x):
+    if len(x)!=1:
+        return x
+    else:
+        return x[0]
+
+class Object:
+    def __init__(self, d=None):
+        if isinstance(d, dict):
+            self.__dict__=d
+
+def message2object(message):
+    "receive a PB message, returns its guid and a object describing the message"
+    fields=message.ListFields()
+    rst=Object()
+    for f in fields:
+        name=f[0].name
+        value=f[1]
+        if isinstance(value, msg.Guid):
+            value=guid2Str(value)
+        else:
+            listable=getattr(value, 'ListFields', None)
+            if listable:
+                value=message2object(value, '')
+            else:
+                container=getattr(value, '_values', None)
+                if container:
+                    value=[message2object(x) for x in container]
+        setattr(rst, name, value)
+    return rst
+
 class TransientDB:
     rclient=None
     def __init__(self, redis):
         self.rclient=redis
-    @staticmethod
-    def message2dict(message):
-        "receive a PB message, returns its guid and a dict describing the message"
-        fields=message.ListFields()
-        rst={}
-        for f in fields:
-            name=f[0].name
-            value=f[1]
-            if isinstance(value, msg.Guid):
-                value=guid2Str(value)
-            else:
-                listable=getattr(value, 'ListFields', None)
-                if listable:
-                    value=message2dict(value, '')
-                else:
-                    container=getattr(value, '_values', None)
-                    if container:
-                        value=[message2dict(x) for x in container]
-            rst[name]=value
-        return rst
     def putChunkServer(self, cksinfo):
-        cksinfo=message2dict(cksinfo)
-        cksguid=cksinfo['guid']; 
-        del cksinfo['guid'];
-        if 'machine' in cksinfo:
-            self.putMachine(cksguid, cksinfo['machine'])
-            del cksinfo['machine']
-        if 'load' in cksinfo:
-            self.putLoad(cksguid, cksinfo['load'])
-            del cksinfo['load']
-        if 'disks'in cksinfo:
-            del cksinfo['disks']
+        cksguid=cksinfo.guid; 
+        if hasattr(cksinfo, 'machine'):
+            self.putMachine(cksguid, cksinfo.machine)
+            del cksinfo.machine
+        if hasattr(cksinfo, 'load'):
+            self.putLoad(cksguid, cksinfo.load)
+            del cksinfo.load
+        if hasattr(cksinfo, 'disks'):
+            del cksinfo.disks
         chunkids=[x.cksguid for x in cksinfo.chunks]
-        #chunks=[{'size':x.size, 'server':cksguid, 'disk':x.reside_on_disk} for x in cksinfo.chunks]
+
+        chunks=cksinfo.chunks
         cksinfo.chunks=chunkids
-
-        self.rclient.sadd('ChunkServers', cksguid)
         self.rclient.hmset('ChunkServer.'+cksguid, cksinfo)
-        for c in cksinfo.chunks:
-            chunkid=c.guid
-            del c.guid
-            c['server']=cksguid
-            self.rclient.hmset('Chunk.'+chunkid, c)
-
-
-    def getChunkServers(self):
-        return self.rclient.smembers('ChunkServers')
-
-    def getChunkLocation(self, chunks):
-        if isinstance(chunks, msg.Guid):
-            # single lookup
-            #return ret
-            pass
-        else:
-            # batch lookup
-            # return ret
-            pass
+        self.rclient.sadd('ChunkServers', cksguid)
+        self.putChunks(chunks)
+    def putChunks(self, serverid, chunks):
+        chunks=container(chunks)
+        for c in chunks:
+            c.server=serverid
+            self.rclient.hmset('Chunk.'+c.guid, c.__dict__)
+            self.rclient.sadd('Chunks', c.guid)
+    def getChunkServerList(self):
+        ret=self.rclient.smembers('ChunkServers')
+        print "type of retv of smembers is ", type(ret)
+        return ret
+    def getChunkList(self):
+        return self.rclient.smembers('Chunks')
+    def getChunkServers(self, serverids):
+        return self.getObjects('Chunk.', serverids)
+    def getChunks(self, chunkids):
+        return self.getObjects('Chunk.', chunkids)
+    def geObjects(self, keyprefix, objectids):
+        objectids=container(objectids)
+        objects =[ Object(self.rclient.hgetall(keyprefix+id)) for id in objectids ]
+        return uncontainer(objects)
 
 class MDS:
     tdb=None
@@ -88,7 +105,8 @@ class MDS:
         self.stub=stub
         self.tdb=transientdb
     def ChunkServerInfo(self, arg):
-        pass;
+        cksinfo=message2object(arg)
+        self.tdb.putChunkServer(arg)
     def NewChunk(self, arg):
         logging.debug(type(arg))
         if isGuidZero(arg.location):
@@ -119,8 +137,8 @@ class MDS:
 
     def DeleteChunk(self, arg):
         logging.debug(type(arg))
-        locations=self.tdb.getChunkLocation(arg.guids)
-        pairs=[ (arg.guids[i], locations[i]) for i in range(len(arg.guids))]
+        chunks=self.tdb.getChunks(arg.guids)
+        pairs=[ (c.guid, c.serverid) for c in chunks ]
         pairs.sort(key = lambda x : x[1])
         done=[]; ret=None;
         for guids,location in MDS.splitLocations(pairs):
