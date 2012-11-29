@@ -5,6 +5,8 @@ class MDS:
 	stub=None
 	def __init__(self, stub):
 		self.stub=stub
+	def ChunkServerInfo(self, arg):
+		logging.debug(type(arg))
 	def NewChunk(self, arg):
 		print type(arg)
 		x=arg.location

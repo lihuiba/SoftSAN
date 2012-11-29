@@ -1,5 +1,6 @@
 import redis, logging, random
-import message_pb2 as msg
+import messages_pb2 as msg
+import rpc, transientdb
 
 def guidAssign(x, y):
     x.a=y.a; x.b=y.b; x.c=y.c; x.d=y.d
@@ -8,7 +9,7 @@ def isGuidZero(x):
     return (x.a==0 and x.b==0 and x.c==0 and x.d==0)
 
 def guid2Str(x):
-    return "%8x-%8x-%8x-%8x" % (x.a, x.b, x.c, x.d)
+    return "%08x-%08x-%08x-%08x" % (x.a, x.b, x.c, x.d)
 
 def guidFromStr(s):
     ret=msg.Guid()
@@ -18,18 +19,6 @@ def guidFromStr(s):
     ret.c=int(s[2], 16)
     ret.d=int(s[3], 16)
     return ret
-
-def container(x):
-    if hasattr(x, '__iter__') or hasattr(x, '__getitem__'):
-        return x
-    else:
-        return (x,)
-
-def uncontainer(x):
-    if len(x)!=1:
-        return x
-    else:
-        return x[0]
 
 class Object:
     def __init__(self, d=None):
@@ -56,47 +45,6 @@ def message2object(message):
         setattr(rst, name, value)
     return rst
 
-class TransientDB:
-    rclient=None
-    def __init__(self, redis):
-        self.rclient=redis
-    def putChunkServer(self, cksinfo):
-        cksguid=cksinfo.guid; 
-        if hasattr(cksinfo, 'machine'):
-            self.putMachine(cksguid, cksinfo.machine)
-            del cksinfo.machine
-        if hasattr(cksinfo, 'load'):
-            self.putLoad(cksguid, cksinfo.load)
-            del cksinfo.load
-        if hasattr(cksinfo, 'disks'):
-            del cksinfo.disks
-        chunkids=[x.cksguid for x in cksinfo.chunks]
-
-        chunks=cksinfo.chunks
-        cksinfo.chunks=chunkids
-        self.rclient.hmset('ChunkServer.'+cksguid, cksinfo)
-        self.rclient.sadd('ChunkServers', cksguid)
-        self.putChunks(chunks)
-    def putChunks(self, serverid, chunks):
-        chunks=container(chunks)
-        for c in chunks:
-            c.server=serverid
-            self.rclient.hmset('Chunk.'+c.guid, c.__dict__)
-            self.rclient.sadd('Chunks', c.guid)
-    def getChunkServerList(self):
-        ret=self.rclient.smembers('ChunkServers')
-        print "type of retv of smembers is ", type(ret)
-        return ret
-    def getChunkList(self):
-        return self.rclient.smembers('Chunks')
-    def getChunkServers(self, serverids):
-        return self.getObjects('Chunk.', serverids)
-    def getChunks(self, chunkids):
-        return self.getObjects('Chunk.', chunkids)
-    def geObjects(self, keyprefix, objectids):
-        objectids=container(objectids)
-        objects =[ Object(self.rclient.hgetall(keyprefix+id)) for id in objectids ]
-        return uncontainer(objects)
 
 class MDS:
     tdb=None
@@ -105,8 +53,9 @@ class MDS:
         self.stub=stub
         self.tdb=transientdb
     def ChunkServerInfo(self, arg):
+        logging.debug(type(arg))
         cksinfo=message2object(arg)
-        self.tdb.putChunkServer(arg)
+        self.tdb.putChunkServer(cksinfo)
     def NewChunk(self, arg):
         logging.debug(type(arg))
         if isGuidZero(arg.location):
@@ -195,19 +144,18 @@ class MDS:
         ret=msg.CreateLink_Response()
         return ret
 
-def server():
-	r=redis.client.Redis()
-	r.subscribe(CHANNEL)
-	while True:
-		msg=r.listen()
-		if msg.type=='subscribe': 
-			continue
-		elif msg.type=='unsubscribe':
-			break
-		elif msg.type!='message' or msg.channel!=CHANNEL
-			assert False, "should receive messages from channel '{0}'".format(CHANNEL)
-			continue
-		msg=proto.
 
+def test_main():
+    logging.basicConfig(level=logging.DEBUG)
+    sched=rpc.Scheduler()
+    stub=rpc.RpcStubCo(msg.Guid(), sched, MDS)
+    tdb=transientdb.TransientDB()
+    server=MDS(stub, tdb)
+    service=rpc.RpcServiceCo(sched, server)
+    stub.setServiceCo(service)
+    while True:
+        service.listen()
+        print "let's listen again"
 
-
+if __name__=="__main__":
+    test_main()

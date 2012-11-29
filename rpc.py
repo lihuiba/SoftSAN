@@ -37,7 +37,7 @@ def BuildMethodInfo(theServer):
 		if func.startswith('__'):
 			continue
 		req=getattr(msg, func+'_Request', None) or getattr(msg, func, type(None))
-		res=getattr(msg, func+'_Response', None)
+		res=getattr(msg, func+'_Response', type(None))
 		ret[func]=(req, res)
 	return ret
 
@@ -66,6 +66,7 @@ class RpcService:
 		method=getattr(self.theServer, methodname)
 		ret=method(argument)
 		rettype=self.methodInfo[methodname][1]
+		print ret, rettype
 		if not isinstance(ret, rettype):
 			raise TypeError('return value of {0} is supposed to be {1}, but in fact {2}'. \
 				format(methodname, rettype, type(ret)))
@@ -114,19 +115,19 @@ class RpcService:
 	def processRequest(self, request):
 		logging.debug("RpcServiceCo: processRequest")
 		ret=self.callMethod(request)
+		response=msg.Header()
+		response.token=request.token
+		response.caller.a=request.caller.a
+		response.caller.b=request.caller.b
+		response.caller.c=request.caller.c
+		response.caller.d=request.caller.d
+		response.errorno=0
+		response.isRequest=False
 		if ret!=None:
-			response=msg.Header()
-			response.token=request.token
-			response.caller.a=request.caller.a
-			response.caller.b=request.caller.b
-			response.caller.c=request.caller.c
-			response.caller.d=request.caller.d
-			response.errorno=0
-			response.isRequest=False
-			response.ret=ret.SerializeToString()
-			caller=CHANNEL_fromGuid(request.caller)
-			logging.debug("replying to %s", caller)
-			self.rclient_pub.publish(caller, response.SerializeToString())
+			response.ret=ret.SerializeToString()		
+		caller=CHANNEL_fromGuid(request.caller)
+		logging.debug("replying to %s", caller)
+		self.rclient_pub.publish(caller, response.SerializeToString())
 
 	def processResponse(self, response):
 		raise NotImplementedError("RpcService doesn't process responses!")
@@ -141,8 +142,10 @@ class RpcServiceCo(RpcService):
 		def starter():
 			try:
 				RpcService.processRequest(self, request)
-			except:
-				pass
+			except Exception as e:
+				#print "Exception occured: ", e
+				import traceback
+				traceback.print_exc()
 			self.sched.prepareDie()
 		self.sched.createThread(starter)
 		logging.debug("RpcServiceCo: service thread created")
@@ -214,6 +217,7 @@ class RpcStub:
 		data=req.SerializeToString()
 		logging.debug("calling %s", self.callee)
 		self.rclient_pub.publish(self.callee, data)
+		
 		record=[req, argument, done, None, None]		# the two Nones will be current thread and response
 		self.callWindow[req.token]=record
 		return record
@@ -221,7 +225,10 @@ class RpcStub:
 		record=self.callWindow[response.token]
 		methodName=record[0].method
 		responseType=self.methodInfo[methodName][1]
-		ret=responseType.FromString(response.ret)
+		if responseType!=type(None):
+			ret=responseType.FromString(response.ret)
+		else:
+			ret=None
 		del self.callWindow[response.token]
 		done=record[2]
 		if done: done(ret)
