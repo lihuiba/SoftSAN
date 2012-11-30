@@ -66,7 +66,6 @@ class RpcService:
 		method=getattr(self.theServer, methodname)
 		ret=method(argument)
 		rettype=self.methodInfo[methodname][1]
-		print ret, rettype
 		if not isinstance(ret, rettype):
 			raise TypeError('return value of {0} is supposed to be {1}, but in fact {2}'. \
 				format(methodname, rettype, type(ret)))
@@ -130,7 +129,8 @@ class RpcService:
 		self.rclient_pub.publish(caller, response.SerializeToString())
 
 	def processResponse(self, response):
-		raise NotImplementedError("RpcService doesn't process responses!")
+		pass
+		# raise NotImplementedError("RpcService doesn't process responses!")
 
 
 class RpcServiceCo(RpcService):
@@ -143,7 +143,6 @@ class RpcServiceCo(RpcService):
 			try:
 				RpcService.processRequest(self, request)
 			except Exception as e:
-				#print "Exception occured: ", e
 				import traceback
 				traceback.print_exc()
 			self.sched.prepareDie()
@@ -164,7 +163,7 @@ class RpcServiceCo(RpcService):
 		key=self.makeKey(response)
 		logging.debug("processResponse: %s", key)
 		if not key in self.responseRegistry:
-			debug.info("session not found in the registry! (%s)", key)
+			#logging.info("session not found in the registry! (%s)", key)
 			return
 		record=self.responseRegistry[key]
 		del self.responseRegistry[key]
@@ -188,7 +187,7 @@ class RpcStub:
 	callee=None
 	def __init__(self, guid, Interface=None, MethodInfo=None):
 		if Interface==None and MethodInfo==None:
-			raise ValueError("At least provide a Interface or a MethodInfo")
+			raise ValueError("At least provide an Interface or a MethodInfo")
 		self.guid=guid
 		self.rclient_pub=redis.client.Redis()
 		self.rclient=redis.client.Redis()
@@ -249,7 +248,8 @@ class RpcStub:
 				assert False, "type of message data should be str!"
 				continue
 			response=msg.Header.FromString(mdata)
-			return self.bottom_half(response)
+			return self.bottom_half(response)		
+		return None, None
 	def callMethod(self, method, argument):
 		record0=self.callMethod_async(method, argument)
 		while True:
@@ -258,7 +258,7 @@ class RpcStub:
 				return ret
 	def callMethod_on(self, method, argument, callee):
 		self.setCallee(callee)
-		self.callMethod(method, argument)
+		return self.callMethod(method, argument)
 
 class RpcStubCo(RpcStub):
 	sched=None
@@ -266,23 +266,24 @@ class RpcStubCo(RpcStub):
 	def __init__(self, guid, scheduler, Interface=None, MethodInfo=None):
 		RpcStub.__init__(self, guid, Interface, MethodInfo)
 		self.sched=scheduler
-	def resume(self, thread, ret, retv):
-		logging.debug("return value: %s", retv)
-		ret[0]=retv
-		self.sched.active(thread)
+	# def resume(self, thread, ret, retv):
+	# 	logging.debug("return value: %s", retv)
+	# 	ret[0]=retv
+	# 	self.sched.active(thread)
 	def callMethod(self, method, argument):
 		ret=[0,]
 		current=greenlet.getcurrent()
-		done = lambda retv : self.resume(current, ret, retv)
-		record=self.callMethod_async(method, argument, done)
+		# done = lambda retv : self.resume(current, ret, retv)
+		record=self.callMethod_async(method, argument, done=None)
 		if self.serviceCo:
 			self.serviceCo.registerResponse(record)		
 		self.sched.suspend(current)
 
+		print 11111111
 		# here, when get resumed, record[4] will be response
 		response=record[4]
-		self.bottom_half(response)
-		return ret[0]
+		record1,ret = self.bottom_half(response)
+		return ret
 	def setServiceCo(self, service):
 		self.serviceCo=service
 
