@@ -1,5 +1,6 @@
 import redis, logging, random
-import message_pb2 as msg
+import messages_pb2 as msg
+import rpc, transientdb
 
 def guidAssign(x, y):
     x.a=y.a; x.b=y.b; x.c=y.c; x.d=y.d
@@ -8,7 +9,7 @@ def isGuidZero(x):
     return (x.a==0 and x.b==0 and x.c==0 and x.d==0)
 
 def guid2Str(x):
-    return "%8x-%8x-%8x-%8x" % (x.a, x.b, x.c, x.d)
+    return "%08x-%08x-%08x-%08x" % (x.a, x.b, x.c, x.d)
 
 def guidFromStr(s):
     ret=msg.Guid()
@@ -19,67 +20,50 @@ def guidFromStr(s):
     ret.d=int(s[3], 16)
     return ret
 
-class TransientDB:
-    rclient=None
-    def __init__(self, redis):
-        self.rclient=redis
-    @staticmethod
-    def message2dict(message):
-        "receive a PB message, returns its guid and a dict describing the message"
-        fields=message.ListFields()
-        rst={}
-        for f in fields:
-            name=f[0].name
-            value=f[1]
-            if isinstance(value, msg.Guid):
-                value=guid2Str(value)
-            else:
-                listable=getattr(value, 'ListFields', None)
-                if listable:
-                    value=message2dict(value, '')
-                else:
-                    container=getattr(value, '_values', None)
-                    if container:
-                        value=[message2dict(x) for x in container]
-            rst[name]=value
-        return rst
-    def putChunkServer(self, cksinfo):
-        cksinfo=message2dict(cksinfo)
-        cksguid=cksinfo['guid']; 
-        del cksinfo['guid'];
-        if 'machine' in cksinfo:
-            self.putMachine(cksguid, cksinfo['machine'])
-            del cksinfo['machine']
-        if 'load' in cksinfo:
-            self.putLoad(cksguid, cksinfo['load'])
-            del cksinfo['load']
-        if 'disks'in cksinfo:
-            del cksinfo['disks']
-        chunkids=[x.cksguid for x in cksinfo.chunks]
-        #chunks=[{'size':x.size, 'server':cksguid, 'disk':x.reside_on_disk} for x in cksinfo.chunks]
-        cksinfo.chunks=chunkids
+class Object:
+    def __init__(self, d=None):
+        if isinstance(d, dict):
+            self.__dict__=d
 
-        self.rclient.sadd('ChunkServers', cksguid)
-        self.rclient.hmset('ChunkServer.'+cksguid, cksinfo)
-        for c in cksinfo.chunks:
-            chunkid=c.guid
-            del c.guid
-            c['server']=cksguid
-            self.rclient.hmset('Chunk.'+chunkid, c)
+def splitbyattr(objs, key):
+    objs.sort(key = lambda x : getattr(x, key))
+    group=None
+    attr=None
+    for p in objs:
+        value=getattr(p, key)
+        if attr==None:
+            group=[p, ]
+            attr=value
+            continue
+        elif attr==value:
+            group.append(p)
+        elif attr!=value:
+            yield group
+            group=[p, ]
+            attr=value
+    if group!=None:
+        yield group
 
-
-    def getChunkServers(self):
-        return self.rclient.smembers('ChunkServers')
-
-    def getChunkLocation(self, chunks):
-        if isinstance(chunks, msg.Guid):
-            # single lookup
-            #return ret
-            pass
+def message2object(message):
+    "receive a PB message, returns its guid and a object describing the message"
+    fields=message.ListFields()
+    rst=Object()
+    for f in fields:
+        name=f[0].name
+        value=f[1]
+        if isinstance(value, msg.Guid):
+            value=guid2Str(value)
         else:
-            # batch lookup
-            # return ret
-            pass
+            listable=getattr(value, 'ListFields', None)
+            if listable:
+                value=message2object(value, '')
+            else:
+                container=getattr(value, '_values', None)
+                if container:
+                    value=[message2object(x) for x in container]
+        setattr(rst, name, value)
+    return rst
+
 
 class MDS:
     tdb=None
@@ -88,50 +72,36 @@ class MDS:
         self.stub=stub
         self.tdb=transientdb
     def ChunkServerInfo(self, arg):
-        pass;
+        logging.debug(type(arg))
+        cksinfo=message2object(arg)
+        self.tdb.putChunkServer(cksinfo)
     def NewChunk(self, arg):
         logging.debug(type(arg))
         if isGuidZero(arg.location):
-            servers=self.tdb.getChunkServers()
+            servers=self.tdb.getChunkServerList()
             x=random.choice(servers)
             x=guidFromStr(x)
             guidAssign(arg.location, x)
         logging.debug("NewChunk on chunk server %s", arg.location)
         retv=self.stub.callMethod_on("NewChunk", arg, arg.location)
-        return retv
-    
-    @staticmethod    
-    def splitLocations(pairs):
-        "input should be like [(guid, location), (guid, location), ...], where locations are ordered"
-        guids=None; location=None;
-        for p in pairs:
-            if location==None:
-                guids=[p[0],]
-                location=p[1]
-                continue
-            elif location==p[1]:
-                guids.append(p[0])
-            elif location!=p[1]:
-                yield guids, location
-                guids=[p[0], ]
-                location=p[1]
-        yield guids, location
-
+        print retv
+        return retv    
     def DeleteChunk(self, arg):
         logging.debug(type(arg))
-        locations=self.tdb.getChunkLocation(arg.guids)
-        pairs=[ (arg.guids[i], locations[i]) for i in range(len(arg.guids))]
-        pairs.sort(key = lambda x : x[1])
-        done=[]; ret=None;
-        for guids,location in MDS.splitLocations(pairs):
-            arg.guids=guids
-            ret=self.stub.callMethod_on("DeleteChunk", arg, location)
+        chunks=self.tdb.getChunks(arg.guids)
+        done=[]
+        for cgroup in splitbyattr(chunks, 'serverid'):
+            arg.guids.clear()
+            for c in cgroup:
+                guid=guidFromStr(c.guid)
+                arg.guids.add()
+                guidAssign(arg.guids[-1], guid)
+            ret=self.stub.callMethod_on("DeleteChunk", arg, cgroup[0].serverid)
             done=done+ret.guids
             if ret.error:
                 break;
         ret.guids=done
         return ret
-
     def NewVolume(self, arg):
         logging.debug(type(arg))
         ret=msg.NewVolume_Response()
@@ -177,19 +147,28 @@ class MDS:
         ret=msg.CreateLink_Response()
         return ret
 
-def server():
-	r=redis.client.Redis()
-	r.subscribe(CHANNEL)
-	while True:
-		msg=r.listen()
-		if msg.type=='subscribe': 
-			continue
-		elif msg.type=='unsubscribe':
-			break
-		elif msg.type!='message' or msg.channel!=CHANNEL
-			assert False, "should receive messages from channel '{0}'".format(CHANNEL)
-			continue
-		msg=proto.
 
+def test_main():
+    sched=rpc.Scheduler()
+    stub=rpc.RpcStubCo(msg.Guid(), sched, MDS)
+    tdb=transientdb.TransientDB()
+    server=MDS(stub, tdb)
+    service=rpc.RpcServiceCo(sched, server)
+    stub.setServiceCo(service)
+    while True:
+        service.listen()
+        print "let's listen again"
 
+def test_split():
+    o1={ 'asdf':123, 'des':823}
+    o2={ 'asdf':231, 'des':238}
+    o3={ 'asdf':312, 'des':382}
+    lst=[Object(o1), Object(o2), Object(o3)]    
+    for group in splitbyattr(lst, 'des'):
+        for c in group:
+            print c.__dict__
 
+if __name__=="__main__":
+    logging.basicConfig(level=logging.DEBUG)
+    test_main()
+    #test_split()

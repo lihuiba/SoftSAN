@@ -39,12 +39,7 @@ class LVM:
 		self.__reload_vgs(); # first query VolumeGroups
 		self.__reload_pvs()  # then query PhysicalVolumes
 		self.__reload_lvs()  # then query LogicalVolumes
-
-	# my function: create lv
-	def my_create_lv(self, vgname, lvname, size):
-		vg = self.get_vgname(vgname)
-		self.create_lv(vg, lvname, size)
-
+		
 	def create_lv(self, vg, lvname, size):
 		unit = size[-1:]
 		if unit in LVM.SIZE_UNITS or unit in LVM.EXTENDS_UNITS:
@@ -63,66 +58,11 @@ class LVM:
 			if status != 0:
 				print "error creating LV"
 				return output
-			print output
-			return None
-		return "Invalid Size!"
-
-	# my function: extend the lv
-	def my_extend_lv(self, lvpath, alter_size):
-		unit = alter_size[-1:]
-		if unit in LVM.SIZE_UNITS or unit in LVM.EXTENDS_UNITS:
-			argv = list()
-			argv.append(LVEXTEND_BIN_PATH)
-			argv.append("-f")
-			argv.append("-L" if unit in LVM.SIZE_UNITS else "-l")
-			argv.append(alter_size)
-			argv.append(lvpath)
 			
-			(status, output) = process_call_argv(argv)
-			if status != 0:
-				print "error extending LV"
-				return output
 			print output
 			return None
 		return "Invalid Size!"
-
-	# my function: reduce the lv
-	def my_reduce_lv(self, lvpath, alter_size):
-		unit = alter_size[-1:]
-		if unit in LVM.SIZE_UNITS or unit in LVM.EXTENDS_UNITS:
-			argv = list()
-			argv.append(LVREDUCE_BIN_PATH)
-			argv.append("-f")
-			argv.append("-L" if unit in LVM.SIZE_UNITS else "-l")
-			argv.append(alter_size)
-			argv.append(lvpath)
-			
-			(status, output) = process_call_argv(argv)
-			if status != 0:
-				print "error reducing LV"
-				return output
-			print output
-			return None
-		return "Invalid Size!"
-
-	# my function: remove lv
-	def my_remove_lv(self, lvpath):
-		argv = list()
-		argv.append(LVREMOVE_BIN_PATH)
-		#argv.append("-t")
-		argv.append("-f")
-		argv.append(lvpath)
 		
-		# execute command
-		(status, output) = process_call_argv(argv)
-		if status != 0:
-			print "error removing LV"
-			return output
-		print output
-		return None
-
-
-
 	def remove_lv(self, lv):
 		# lv remove command
 		argv = list()
@@ -165,7 +105,7 @@ class LVM:
 		if status != 0:
 			print "error getting list of VG"
 			return
-			
+		
 		# parse command output
 		lines = output.splitlines()
 		for line in lines:
@@ -287,7 +227,7 @@ class LVM:
 			lv = LogicalVolume(lvname, self.lvs_paths[vgname + '`' + lvname], vgname, True, attrs, uuid, lv_size, extent_size)
 			if vgname:
 				self.__vgs[vgname].append_lv(lv)
-				
+
 	def print_out(self):
 		for vg in self.vgs:
 			print "VG %s (total: %s, allocated: %s, free: %s)" % (vg.name, vg.total, vg.allocated, vg.free)
@@ -301,6 +241,3 @@ class LVM:
 			print "\tLV(s): "
 			for lv in vg.lvs:
 				print "\t%s (path: %s, size: %s)" % (lv.name, lv.path, lv.total)
-
-	
-

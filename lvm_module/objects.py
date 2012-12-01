@@ -20,8 +20,8 @@ class Volume:
 		self.allocated_extents = None
 		self.free_extents = None
 		self.total = None
-		self.allocated = None
-		self.free = None
+		self.allocated = None;
+		self.free = None;
 		
 	def set_extent_count(self, total, allocated):
 		self.total_extents = int(total)
