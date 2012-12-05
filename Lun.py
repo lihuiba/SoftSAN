@@ -15,7 +15,7 @@ class Lun(object):
     
 
 
-    def __init__(self, index='', path='', size='Size: 0'):
+    def __init__(self, index='1', path='', size='0'):
         '''
         Constructor
         '''
@@ -65,9 +65,9 @@ class Lun(object):
             
             print '-----', self.index, '-----'
             
-            print self.path.strip()
+            print 'path : ', self.path.strip()
             
-            print self.size.strip()
+            print 'size : ', self.size.strip()
             
             print ''
             
@@ -79,7 +79,7 @@ class Lun(object):
         
 if __name__ == '__main__':
     
-    lun = Lun('null', '//', 0)
+    lun = Lun('lun1', '/dev/tgtdisk')
     
     lun.show()
     

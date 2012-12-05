@@ -59,11 +59,11 @@ class Target():
                              
     
     def delete_lun(self, lun_index=None):
-        
+        dd
         if lun == None:
           
             return False
-       
+        
         for lu in self.lunlist:
          
             if lun_index == filter(str.isdigit, lu.index):
@@ -82,11 +82,11 @@ if __name__ == '__main__':
     
 #    lun = Lun('LUN: null', '//', 0)
     
-    tgt = Target('Target0: iqn.test:node0')
+    tgt = Target('Target0: test:node0')
     
-    tgt.show()
+    # tgt.show()
     
-    lun = Lun('null', '//', 0)
+    lun = Lun('lun 1', '/VolGroup/disk1')
     
     tgt.add_lun(lun)
     
