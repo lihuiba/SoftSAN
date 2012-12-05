@@ -6,23 +6,19 @@ message Guid {
     required fixed32 d=4;
 }
 
-message Request {
-    required uint32 token=1;
-    required Guid caller=2;
-    required string method=3;
-    required bytes argument=4;
-}
-
-message Response {
-    required uint32 token=1;
-    required uint32 errorno=2;
-    required bytes ret=3;
+message Header {
+    required Guid caller=1;      // the initial caller
+    required uint32 token=2;
+    optional string method=4;
+    optional bytes argument=5;
+    optional bytes ret=6;
+    optional uint32 errorno=7;
 }
 
 message ChunkInfo {
     required Guid guid=1;
     required uint32 size=2;    //in MB
-//    optional uint32 reside_on_disk=3;
+    optional uint32 reside_on_disk=3;
 }
 
 message SMARTInfo {
@@ -97,7 +93,7 @@ message LoadInfo{
 
 }
 
-message ChunkServerInfo {
+message ChunkServerInfo {                   //P2S message
     required Guid guid=1;
     optional MachineInfo machine=2;
     repeated DiskInfo disks=3;
@@ -105,85 +101,87 @@ message ChunkServerInfo {
     optional LoadInfo load=5;
 }
 
-message NewChunk_Request {
-    required uint32 size=1;       //in MB
-    optional Guid location=2;     //can be server guid or disk guid
+message NewChunk_Request {                  //P2SP message
+    required uint32 size=1;                 //in MB
+    optional Guid location=2;               //target server guid, or (0,0,0,0) for any location
 }
 
 message NewChunk_Response {
-    required uint32 size=1;
-    required Guid guid=2;
+    required uint32 size=1;                 //size of the created chunk
+    required Guid guid=2;                   //guid of the created chunk
     optional string error=101;
 }
 
-message DeleteChunk_Request {
-    required Guid guid=1;
+message DeleteChunk_Request {               //P2SP message
+    repeated Guid guids=1;                  //array of guids of the chunks to delete
 }
 
 message DeleteChunk_Response {
-    required Guid guid=1;
-    optional string error=101;
+    repeated Guid guids=1;                  //array of guids of the chunks that has been deleted
+    optional string error=101;              //error code that describes why some chunks are not deleted, if any
 }
 
 message Volume {
-    optional Guid chunk=100;                //A volume is either a chunk,
-    repeated Volume subvolumes=1;           //or a list of sub-volumes
-    optional string assembler=2;            //that is assembled by an assembler.
-    required uint64 size=3;                 //in MB
+    required uint64 size=1;                 //in MB, only caculated by MDS
+    optional string assembler=2;            //assembled by an assembler,
+    repeated string parameters=3;           //with parameters
+    repeated Volume subvolumes=4;           //and a list of sub-volumes
+    required Guid guid=5;                   //A volume can have a name (guid), or reference a chunk
 }
 
-message VolumePackage {
-    required bytes volume=1;
-}
+//message VolumePackage {
+//    required bytes volume=1;                //PB-encoded Volume as bytes
+//}
 
-message ReadVolume_Request {
+message ReadVolume_Request {                //P2S message
     required string fullpath=1;
 }
 
 message ReadVolume_Response {
-    required Volume volume=2;
+    required bytes volume=1;                //PB-encoded Volume as bytes
+    optional string error=101;
 }
 
-message WriteVolume_Request {
+message WriteVolume_Request {               //P2S message
     required string fullpath=1;
-    required Volume volume=2;
+    required bytes volume=2;                //PB-encoded Volume as bytes
 }
 
 message WriteVolume_Response {
     optional string error=101;
 }
 
-message NewVolume_Request {
+message NewVolume_Request {                 //P2SP message
     required string fullpath=1;
     required uint32 mod=2;
-    optional Volume volume=3;
+    optional bytes volume=3;                //PB-encoded Volume as bytes
 }
 
 message NewVolume_Response {
     optional string error=101;
 }
 
-message ChMod_Request {
-    required string fullpath=1;
-    required uint32 mod=2;
-}
+//message ChMod_Request {
+//    required string fullpath=1;
+//   required uint32 mod=2;
+//}
 
-message ChMod_Response {
-    optional string error=101;
-}
+//message ChMod_Response {
+//    optional string error=101;
+//}
 
 //also used to "assemble" (active) a single chunk
-message AssembleVolume_Request {
-    required Volume volume=1;
+message AssembleVolume_Request {            //P2P message
+    required Volume volume=1;               //PB-encoded Volume as bytes
 }
 
 message AssembleVolume_Response {
     required string access_point=1;
-    repeated string APs=2;               // all the access points, if results in more than one.
+    repeated string APs=2;                  // all the access points, if results in more than one.
     optional string error=101;
 }
 
-message DisassembleVolume_Request {
+message DisassembleVolume_Request {         //P2P message
     required string access_point=1;
 }
 
@@ -192,13 +190,13 @@ message DisassembleVolume_Response {
     optional string error=101;
 }
 
-message RepairVolume_Request {
-}
+//message RepairVolume_Request {
+//}
 
-message RepairVolume_Response {
-}
+//message RepairVolume_Response {
+//}
 
-message MoveVolume_Request {
+message MoveVolume_Request {                //P2S message
     required string volume=1;
     required string destination=2;
 }
@@ -207,7 +205,7 @@ message MoveVolume_Response {
     optional string error=101;
 }
 
-message DeleteVolume_Request {
+message DeleteVolume_Request {              //P2SP message
     optional uint32 token=100;
     required string volume=1;
 }
@@ -216,27 +214,27 @@ message DeleteVolume_Response {
     optional string error=101;
 }
 
-message CreateLink_Request {
-    required string destination=1;
-    required string link=2;
-}
+//message CreateLink_Request {
+//    required string destination=1;
+//    required string link=2;
+//}
 
-message CreateLink_Response {
-    optional string error=101;
-}
+//message CreateLink_Response {
+//    optional string error=101;
+//}
 
 
 service MDSService {
-    rpc NewChunk(NewChunk_Request)                   returns (NewChunk_Response);
-    rpc DeleteChunk(DeleteChunk_Request)             returns (DeleteChunk_Response);
+    rpc NewChunk(NewChunk_Request)                   returns(NewChunk_Response);
+    rpc DeleteChunk(DeleteChunk_Request)             returns(DeleteChunk_Response);
     rpc NewVolume(NewVolume_Request)                 returns(NewVolume_Response);
-    rpc AssembleVolume(AssembleVolume_Request)       returns (AssembleVolume_Response);
-    rpc DisassembleVolume(DisassembleVolume_Request) returns (DisassembleVolume_Response);
-    rpc RepairVolume(RepairVolume_Request)           returns (RepairVolume_Response);
+    rpc AssembleVolume(AssembleVolume_Request)       returns(AssembleVolume_Response);
+    rpc DisassembleVolume(DisassembleVolume_Request) returns(DisassembleVolume_Response);
+//    rpc RepairVolume(RepairVolume_Request)           returns(RepairVolume_Response);
     rpc ReadVolume(ReadVolume_Request)               returns(ReadVolume_Response);
     rpc WriteVolume(WriteVolume_Request)             returns(WriteVolume_Response);
     rpc MoveVolume(MoveVolume_Request)               returns(MoveVolume_Response);
-    rpc ChMod(ChMod_Request)                         returns(ChMod_Response);
+//    rpc ChMod(ChMod_Request)                         returns(ChMod_Response);
     rpc DeleteVolume(DeleteVolume_Request)           returns(DeleteVolume_Response);
-    rpc CreateLinK(CreateLink_Request)               returns(CreateLink_Response);
+//    rpc CreateLinK(CreateLink_Request)               returns(CreateLink_Response);
 }

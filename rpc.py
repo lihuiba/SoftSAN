@@ -1,5 +1,6 @@
-import redis, inspect, logging
+import logging
 import messages_pb2 as msg
+import guid as Guid
 
 # MethodInfo={
 #	"NewChunk":         (msg.NewChunk_Request,          msg.NewChunk_Response),
@@ -16,151 +17,86 @@ import messages_pb2 as msg
 #	"CreateLinK":       (msg.CreateLink_Request,        msg.CreateLink_Response),
 #}
 
-
-CHANNEL='SoftSAN.RPC.0'
-CHANNEL_MDS=CHANNEL+'.MDS'
-
-def CHANNEL_Client(guid):
-	global CHANNEL
-	client="{0}.{1}.{2}.{3}.{4}".format(CHANNEL, \
-		guid.a, guid.b, guid.c, guid.d)
-	return client
+class ServiceTerminated:
+	pass
 
 def BuildMethodInfo(theServer):
 	ret={}
 	for func in dir(theServer):
 		if func.startswith('__'):
 			continue
-		req=getattr(msg, func+'_Request', None)
-		res=getattr(msg, func+'_Response', None)
-		if inspect.isclass(req) and inspect.isclass(res):
-			ret[func]=(req, res)
-		# else:
-		# 	print func, req, res
+		req=getattr(msg, func+'_Request', None) or getattr(msg, func, type(None))
+		res=getattr(msg, func+'_Response', type(None))
+		ret[func]=(req, res)
 	return ret
 
+
+def sendRpc(s, guid, token, name, body):
+	'''Guid token messageName bodySize\n'''
+	line="%s %u %s %u\n" % (Guid.toStr(guid), token, name, len(body))
+	s.sendall(line)
+	s.sendall(body)
+def recvRpc(s):
+	fd=s.makefile()
+	parts=fd.readline().split()
+	if len(parts)==0:
+		raise ServiceTerminated()
+	guid=Guid.fromStr(parts[0])
+	token=int(parts[1])
+	name=parts[2]
+	size=int(parts[3])
+	body=fd.read(size)
+	fd.close()
+	if len(body)!=size:
+		s.close()
+		raise IOError('invalid request')
+	return guid,token,name,body
+
 class RpcService:
-	theServer=None
-	methodInfo=None
-	rclient=None
-	rclient_pub=None
-	def __init__(self, MDSServer, MethodInfo=None):
-		self.theServer=MDSServer
-		self.rclient=redis.client.Redis()
-		self.rclient_pub=redis.client.Redis()
-		self.methodInfo=MethodInfo or BuildMethodInfo(MDSServer)
-		logging.info(self.methodInfo)
-
-	#request must be an instance of msg.Request
-	def callMethod(self, request):
-		methodname=request.method
-		argument=self.methodInfo[methodname][0]()
-		argument.ParseFromString(request.argument)
-		method=getattr(self.theServer, methodname)
-		ret=method(argument)
-		rettype=self.methodInfo[methodname][1]
-		if not isinstance(ret, rettype):
-			raise TypeError('return value of {0} is supposed to be {1}, but in facet {2}'. \
-				format(methodname, rettype, type(ret)))
-		return ret
-
-	def listen(self):
-		global CHANNEL_MDS
-		self.rclient.subscribe(CHANNEL_MDS)
-		for message in self.rclient.listen():
-			logging.debug(message)
-			mtype=message['type']
-			mdata=message['data']
-			if mtype=='subscribe': 
-				continue
-			elif mtype=='unsubscribe':
-				break
-			elif mtype!='message' or message['channel']!=CHANNEL_MDS:
-				assert False, "should receive messages from channel '{0}'".format(CHANNEL_MDS)
-				continue
-			elif not isinstance(mdata, str):
-				assert False, "type of message data should be str!"
-				continue
-			request=msg.Request.FromString(mdata)
-			
-			ret=self.callMethod(request)
-			
-			response=msg.Response()
-			response.token=request.token
-			response.errorno=0
-			response.ret=ret.SerializeToString()
-			caller=CHANNEL_Client(request.caller)
-			self.rclient_pub.publish(caller, response.SerializeToString())
+	def __init__(self, Server, MethodInfo=None):
+		self.methodInfo=MethodInfo or BuildMethodInfo(Server)
+		self.theServer=Server
+		logging.info(self.methodInfo.keys())
+	def handler(self, socket, address):
+		try:
+			while True:
+				guid,token,name,body=recvRpc(socket)
+				MI=self.methodInfo[name]
+				argument=MI[0].FromString(body)
+				method=getattr(self.theServer, name)
+				ret=method(argument)
+				assert type(ret)==MI[1]
+				if ret==None: 
+					continue
+				body=ret.SerializeToString()
+				sendRpc(socket, guid, token, name, body)
+		except ServiceTerminated:
+			pass
 
 class RpcStub:
-	token=0;
-	methodInfo=None
-	rclient=None
-	rclient_pub=None
-	guid=None
-	callWindow={}
-	def __init__(self, guid, Interface=None, MethodInfo=None):
+	def __init__(self, guid, socket, Interface=None, MethodInfo=None):
 		if Interface==None and MethodInfo==None:
-			raise ValueError("At least provide a Interface or a MethodInfo")
+			raise ValueError("At least provide an Interface or a MethodInfo")
+		self.socket=socket
 		self.guid=guid
-		self.rclient_pub=redis.client.Redis()
-		self.rclient=redis.client.Redis()
-		self.myChannel=CHANNEL_Client(guid)
-		self.rclient.subscribe(self.myChannel)
-		if isinstance(MethodInfo, dict):  #if it's MethodInfo
+		self.token=0
+		if isinstance(MethodInfo, dict):    #if it's MethodInfo
 			self.methodInfo=MethodInfo
 		else:
 			self.methodInfo=BuildMethodInfo(Interface)
 		logging.info(self.methodInfo.keys())
-
-	#request must be an instance of msg.Request
-	def callMethod_async(self, method, argument, done=None):
-		global CHANNEL_MDS
-		req=msg.Request()
-		req.token=self.token
-		self.token=self.token+1
-		req.method=method
-		req.caller.a=self.guid.a
-		req.caller.b=self.guid.b
-		req.caller.c=self.guid.c
-		req.caller.d=self.guid.d
-		req.argument=argument.SerializeToString()
-		data=req.SerializeToString()
-		self.rclient_pub.publish(CHANNEL_MDS, data)
-		record=(req, argument, done)
-		self.callWindow[req.token]=record
-		return record
-
-	def wait(self):
-		for message in self.rclient.listen():
-			logging.debug(message)
-			mtype=message['type']
-			mdata=message['data']
-			if mtype=='subscribe': 
-				continue
-			elif mtype=='unsubscribe':
-				break
-			elif mtype!='message' or message['channel']!=self.myChannel:
-				assert False, "should receive messages from channel '{0}'".format(self.myChannel)
-				continue
-			elif not isinstance(mdata, str):
-				assert False, "type of message data should be str!"
-				continue
-			res=msg.Response.FromString(mdata)
-			record=self.callWindow[res.token]
-			responseType=self.methodInfo[record[0].method][1]
-			ret=responseType.FromString(res.ret)
-			del self.callWindow[res.token]
-			done=record[2]
-			if done: done(ret)
-			return record, ret
-
-	def callMethod(self, method, argument):
-		record0=self.callMethod_async(method, argument)
-		while True:
-			record1,ret = self.wait()
-			if record0==record1:
-				return ret
+	def callMethod(self, name, argument):
+		MI=self.methodInfo[name]
+		assert type(argument)==MI[0]
+		body=argument.SerializeToString()
+		sendRpc(self.socket, self.guid, self.token, name, body)
+		guid,token,name_,body_ = recvRpc(self.socket)
+		assert guid==self.guid
+		assert token==self.token
+		assert name_==name
+		self.token=token+1
+		ret=MI[1].FromString(body_)
+		return ret
 
 
 ###################### Test ####################################
