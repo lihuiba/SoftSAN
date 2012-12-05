@@ -1,7 +1,5 @@
-import inspect, logging
+import logging
 import messages_pb2 as msg
-import time, collections
-import gevent
 import guid as Guid
 
 # MethodInfo={
@@ -19,6 +17,9 @@ import guid as Guid
 #	"CreateLinK":       (msg.CreateLink_Request,        msg.CreateLink_Response),
 #}
 
+class ServiceTerminated:
+	pass
+
 def BuildMethodInfo(theServer):
 	ret={}
 	for func in dir(theServer):
@@ -32,16 +33,18 @@ def BuildMethodInfo(theServer):
 
 def sendRpc(s, guid, token, name, body):
 	'''Guid token messageName bodySize\n'''
-	line="%s %u %s %s %u\n" % (Guid.toStr(guid), token, name, len(body))
+	line="%s %u %s %u\n" % (Guid.toStr(guid), token, name, len(body))
 	s.sendall(line)
 	s.sendall(body)
 def recvRpc(s):
 	fd=s.makefile()
 	parts=fd.readline().split()
+	if len(parts)==0:
+		raise ServiceTerminated()
 	guid=Guid.fromStr(parts[0])
 	token=int(parts[1])
 	name=parts[2]
-	size=int(parts[4])
+	size=int(parts[3])
 	body=fd.read(size)
 	fd.close()
 	if len(body)!=size:
@@ -49,27 +52,32 @@ def recvRpc(s):
 		raise IOError('invalid request')
 	return guid,token,name,body
 
-class RpcService(gevent.server.StreamServer):
-	def __init__(Server, MethodInfo=None, port):
-		gevent.server.StreamServer(('0.0.0.0', port), self.handle)
+class RpcService:
+	def __init__(self, Server, MethodInfo=None):
 		self.methodInfo=MethodInfo or BuildMethodInfo(Server)
 		self.theServer=Server
-		logging.info(self.methodInfo)
+		logging.info(self.methodInfo.keys())
 	def handler(self, socket, address):
-		guid,token,name,body=recvRpc(socket)
-		MI=self.methodInfo[name]
-		argument=MI[0].FromString(body)
-		method=getattr(self.theServer, name)
-		ret=method(argument)
-		assert type(ret)==MI[1]
-		if ret==None: return
-		body=ret.SerializeToString()
-		sendRpc(socket, guid, token, name, body)
+		try:
+			while True:
+				guid,token,name,body=recvRpc(socket)
+				MI=self.methodInfo[name]
+				argument=MI[0].FromString(body)
+				method=getattr(self.theServer, name)
+				ret=method(argument)
+				assert type(ret)==MI[1]
+				if ret==None: 
+					continue
+				body=ret.SerializeToString()
+				sendRpc(socket, guid, token, name, body)
+		except ServiceTerminated:
+			pass
 
-class RpcStub(gevent.socket.socket):
-	def __init__(self, guid, Interface=None, MethodInfo=None):
+class RpcStub:
+	def __init__(self, guid, socket, Interface=None, MethodInfo=None):
 		if Interface==None and MethodInfo==None:
 			raise ValueError("At least provide an Interface or a MethodInfo")
+		self.socket=socket
 		self.guid=guid
 		self.token=0
 		if isinstance(MethodInfo, dict):    #if it's MethodInfo
@@ -81,8 +89,8 @@ class RpcStub(gevent.socket.socket):
 		MI=self.methodInfo[name]
 		assert type(argument)==MI[0]
 		body=argument.SerializeToString()
-		sendRpc(self, self.guid, self.token, name, body)
-		guid,token,name_,body_ = recvRpc(self)
+		sendRpc(self.socket, self.guid, self.token, name, body)
+		guid,token,name_,body_ = recvRpc(self.socket)
 		assert guid==self.guid
 		assert token==self.token
 		assert name_==name

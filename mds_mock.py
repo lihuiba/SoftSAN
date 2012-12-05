@@ -1,10 +1,19 @@
-import rpc
+import rpc, logging
 import messages_pb2 as msg
+import guid as Guid
+
+def myNewChunk(arg):
+	ret=msg.NewChunk_Response()
+	ret.size=arg.size
+	ret.guid.a=0x66
+	ret.guid.b=0x77
+	ret.guid.c=0x88
+	ret.guid.d=0x99	
+	return ret
 
 class MDS:
-	stub=None
-	def __init__(self, stub):
-		self.stub=stub
+	def __init__(self):
+		pass
 	def ChunkServerInfo(self, arg):
 		logging.debug(type(arg))
 	def NewChunk(self, arg):
@@ -13,16 +22,17 @@ class MDS:
 		if x.a==0 and x.b==0 and x.c==0 and x.d==0:
 			x.a=9; x.b=8; x.c=7; x.d=6;
 		print "Relay NewChunk to 9.8.7.6"
-		ret0=self.stub.callMethod_on("NewChunk", arg, x)
+		# ret0=self.stub.callMethod_on("NewChunk", arg, x)
+		ret0=myNewChunk(arg)
 		print "Got response from 9.8.7.6:", ret0
 		return ret0
 	def DeleteChunk(self, arg):
 		print type(arg)
 		ret=msg.DeleteChunk_Response()
-		ret.guid.a=arg.guid.a
-		ret.guid.b=arg.guid.b
-		ret.guid.c=arg.guid.c
-		ret.guid.d=arg.guid.d
+		for x in arg.guids:
+			ret.guids.add()
+			y=ret.guids[-1]
+			Guid.assign(y, x)
 		return ret
 	def NewVolume(self, arg):
 		print type(arg)

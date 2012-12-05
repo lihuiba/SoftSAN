@@ -7,9 +7,8 @@ message Guid {
 }
 
 message Header {
-    required uint32 token=1;
-    required Guid caller=2;      // the initial caller
-    required bool isRequest=3;
+    required Guid caller=1;      // the initial caller
+    required uint32 token=2;
     optional string method=4;
     optional bytes argument=5;
     optional bytes ret=6;
@@ -114,20 +113,20 @@ message NewChunk_Response {
 }
 
 message DeleteChunk_Request {               //P2SP message
-    required Guid guids=1;                  //array of guids of the chunks to delete
+    repeated Guid guids=1;                  //array of guids of the chunks to delete
 }
 
 message DeleteChunk_Response {
-    required Guid guids=1;                  //array of guids of the chunks that has been deleted
+    repeated Guid guids=1;                  //array of guids of the chunks that has been deleted
     optional string error=101;              //error code that describes why some chunks are not deleted, if any
 }
 
 message Volume {
-    optional Guid chunk=100;                //A volume is either a chunk,
-    required uint64 size=1;                 //in MB
-    optional string assembler=2;            //that is assembled by an assembler.
-    repeated string parameters=3;
-    repeated Volume subvolumes=4;           //or a list of sub-volumes
+    required uint64 size=1;                 //in MB, only caculated by MDS
+    optional string assembler=2;            //assembled by an assembler,
+    repeated string parameters=3;           //with parameters
+    repeated Volume subvolumes=4;           //and a list of sub-volumes
+    required Guid guid=5;                   //A volume can have a name (guid), or reference a chunk
 }
 
 //message VolumePackage {
@@ -140,7 +139,7 @@ message ReadVolume_Request {                //P2S message
 
 message ReadVolume_Response {
     required bytes volume=1;                //PB-encoded Volume as bytes
-    optional string error=101
+    optional string error=101;
 }
 
 message WriteVolume_Request {               //P2S message
@@ -191,11 +190,11 @@ message DisassembleVolume_Response {
     optional string error=101;
 }
 
-#message RepairVolume_Request {
-#}
+//message RepairVolume_Request {
+//}
 
-#message RepairVolume_Response {
-#}
+//message RepairVolume_Response {
+//}
 
 message MoveVolume_Request {                //P2S message
     required string volume=1;
@@ -215,14 +214,14 @@ message DeleteVolume_Response {
     optional string error=101;
 }
 
-#message CreateLink_Request {
-#    required string destination=1;
-#    required string link=2;
-#}
+//message CreateLink_Request {
+//    required string destination=1;
+//    required string link=2;
+//}
 
-#message CreateLink_Response {
-#    optional string error=101;
-#}
+//message CreateLink_Response {
+//    optional string error=101;
+//}
 
 
 service MDSService {
@@ -231,11 +230,11 @@ service MDSService {
     rpc NewVolume(NewVolume_Request)                 returns(NewVolume_Response);
     rpc AssembleVolume(AssembleVolume_Request)       returns(AssembleVolume_Response);
     rpc DisassembleVolume(DisassembleVolume_Request) returns(DisassembleVolume_Response);
-    rpc RepairVolume(RepairVolume_Request)           returns(RepairVolume_Response);
+//    rpc RepairVolume(RepairVolume_Request)           returns(RepairVolume_Response);
     rpc ReadVolume(ReadVolume_Request)               returns(ReadVolume_Response);
     rpc WriteVolume(WriteVolume_Request)             returns(WriteVolume_Response);
     rpc MoveVolume(MoveVolume_Request)               returns(MoveVolume_Response);
-    rpc ChMod(ChMod_Request)                         returns(ChMod_Response);
+//    rpc ChMod(ChMod_Request)                         returns(ChMod_Response);
     rpc DeleteVolume(DeleteVolume_Request)           returns(DeleteVolume_Response);
-    rpc CreateLinK(CreateLink_Request)               returns(CreateLink_Response);
+//    rpc CreateLinK(CreateLink_Request)               returns(CreateLink_Response);
 }
