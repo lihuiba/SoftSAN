@@ -381,7 +381,7 @@ static uint64_t _get_device_size(const char *name)
 	return size;
 }
 
-//to parse the command, mainly about the arguments
+//Parse the command arguments
 static int _process_switches(int *argc, char ***argv, const char *dev_dir)
 {
 	char *base, *namebase, *s;
@@ -757,34 +757,38 @@ static int _remove(int argc, char **argv, void *data __attribute((unused)))
 	return _simple(DM_DEVICE_REMOVE, argc > 1 ? argv[1] : NULL, 0, 0);
 }
 
+//get a device's info, now only basic info
+static int _info(int argc, char **argv, void *data __attribute((unused)))
+{
+	int r = 0;
+	char *name = argv[2];
+	struct dm_task *dmt;
+	struct dm_info info;
+
+	dmt = dm_task_create(DM_DEVICE_INFO);
+	_set_task_device(dmt, name, 0);
+	dm_task_run(dmt);
+
+	dm_task_get_info(dmt, &info);
+	//printf("device name is:----%s\n", dm_task_get_name(dmt));
+
+	return r;
+}
+
+//find a command
 static struct command _commands[] = {
-	{"create", "<dev_name> [-j|--major <major> -m|--minor <minor>]\n"
-	  "\t                  [-U|--uid <uid>] [-G|--gid <gid>] [-M|--mode <octal_mode>]\n"
-	  "\t                  [-u|uuid <uuid>]\n"
-	  "\t                  [--notable | --table <table> | <table_file>]",
-	 1, 2, _create},
-	 {"remove", "[-f|--force] <device>", 0, 1, _remove},
-	{NULL, NULL, 0, 0, NULL}
+		{"create", "<device_name> ", 1, 2, _create},
+		{"remove", "<device_name>", 0, 1, _remove},
+		//{"info", "<device_name>", 0, 1, _info},
+		{NULL, NULL, 0, 0, NULL}
 };
 
 static void _usage(FILE *out)
 {
-	int i;
-
 	fprintf(out, "Usage:\n\n");
-	fprintf(out, "dmsetup [--version] [-v|--verbose [-v|--verbose ...]]\n"
-		"        [-r|--readonly] [--noopencount] [--nolockfs]\n"
-		"        [--readahead [+]<sectors>|auto|none]\n"
-		"        [-c|-C|--columns] [-o <fields>] [-O|--sort <sort_fields>]\n"
-		"        [--nameprefixes] [--noheadings] [--separator <separator>]\n\n");
-	for (i = 0; _commands[i].name; i++)
-		fprintf(out, "\t%s %s\n", _commands[i].name, _commands[i].help);
-	fprintf(out, "\n<device> may be device name or -u <uuid> or "
-		     "-j <major> -m <minor>\n");
-	fprintf(out, "<fields> are comma-separated.  Use 'help -c' for list.\n");
-	fprintf(out, "Table_file contents may be supplied on stdin.\n");
-	fprintf(out, "Tree options are: ascii, utf, vt100; compact, inverted, notrunc;\n"
-		     "                  [no]device, active, open, rw and uuid.\n");
+	fprintf(out, "create <device_name>  <mapping_table_file>\n"
+		"remove <device_name>\n"
+		"info   <device_name>\n");
 	fprintf(out, "\n");
 	return;
 }
@@ -800,185 +804,11 @@ static struct command *_find_command(const char *name)
 	return NULL;
 }
 
-/*int execute(int argc, char **argv)
-{
-	struct command *c;
-	int r = 1;
-	const char *dev_dir;
-
-	(void) setlocale(LC_ALL, "");
-
-	dev_dir = getenv ("DM_DEV_DIR");
-	if (dev_dir && *dev_dir) {
-		if (!dm_set_dev_dir(dev_dir)) {
-			fprintf(stderr, "Invalid DM_DEV_DIR environment variable value.\n");
-			goto out;
-		}
-	} else
-		dev_dir = DEFAULT_DM_DEV_DIR;
-
-	if (!_process_switches(&argc, &argv, dev_dir)) {
-		fprintf(stderr, "Couldn't process command line.\n");
-		goto out;
-	}
-
-	if (_switches[VERSION_ARG]) {
-		c = _find_command("version");
-		goto doit;
-	}
-
-	if (argc == 0) {
-		_usage(stderr);
-		goto out;
-	}
-
-	if (!(c = _find_command(argv[0]))) {
-		fprintf(stderr, "Unknown command\n");
-		_usage(stderr);
-		goto out;
-	}
-
-	if (argc < c->min_args + 1 ||
-		(c->max_args >= 0 && argc > c->max_args + 1)) {
-		fprintf(stderr, "Incorrect number of arguments\n");
-		_usage(stderr);
-		goto out;
-	}
-
-//	if (_switches[COLS_ARG] && !_report_init(c))
-//		goto out;
-
-	  doit:
-	if (!c->fn(argc, argv, NULL)) {
-		fprintf(stderr, "Command failed\n");
-		goto out;
-	}
-
-	r = 0;
-
-out:
-	if (_report) {
-		dm_report_output(_report);
-		dm_report_free(_report);
-	}
-
-	if (_dtree)
-		dm_tree_free(_dtree);
-
-	return r;
-}*/
-
-//this function convert a python list into a C string array
-static void PyListToC(PyObject *pylist, char ***argv)
-{
-	int i, len;
-	PyObject * pystring;
-	len = PyList_Size(pylist);
-	for(i = 0; i < len; i++)
-	{
-		pystring = PyList_GetItem(pylist, i);
-		(*argv)[i] = (char *)malloc(sizeof(char[100]));
-		(*argv)[i] = PyString_AsString(pystring);
-	}
-}
-
-static int execute(int argc, char **argv)//this function is used to execute a C function
-{
-	struct command *c;
-	int r = 1;
-	const char *dev_dir;
-
-	(void) setlocale(LC_ALL, "");
-
-	dev_dir = getenv ("DM_DEV_DIR");
-	if (dev_dir && *dev_dir) {
-		if (!dm_set_dev_dir(dev_dir)) {
-			fprintf(stderr, "Invalid DM_DEV_DIR environment variable value.\n");
-			goto out;
-		}
-	} else
-		dev_dir = DEFAULT_DM_DEV_DIR;
-
-	if (!_process_switches(&argc, &argv, dev_dir)) {
-		fprintf(stderr, "Couldn't process command line.\n");
-		goto out;
-	}
-
-	if (_switches[VERSION_ARG]) {
-		c = _find_command("version");
-		goto doit;
-	}
-
-	if (argc == 0) {
-		_usage(stderr);
-		goto out;
-	}
-
-	if (!(c = _find_command(argv[0]))) {
-		fprintf(stderr, "Unknown command\n");
-		_usage(stderr);
-		goto out;
-	}
-
-	if (argc < c->min_args + 1 ||
-		(c->max_args >= 0 && argc > c->max_args + 1)) {
-		fprintf(stderr, "Incorrect number of arguments\n");
-		_usage(stderr);
-		goto out;
-	}
-
-	//if (_switches[COLS_ARG] && !_report_init(c))
-		//goto out;
-
-	  doit:
-	if (!c->fn(argc, argv, NULL)) {
-		fprintf(stderr, "Command failed\n");
-		goto out;
-	}
-
-	r = 0;
-
-out:
-	if (_report) {
-		dm_report_output(_report);
-		dm_report_free(_report);
-	}
-
-	if (_dtree)
-		dm_tree_free(_dtree);
-
-	return 0;
-}
-
-//can't be defined as tpye static, or it won't be recognize by python while using the ctypes method
-int Parse_Arg(int argc, char * command)
-{
-	int i;
-	char *argv[100];
-	char s[100];
-	//printf("the python command is : %s \n", command);
-	for(i = 0; i < argc; i++)
-	{
-		sscanf(command, "%s", s);
-		argv[i] = (char *)malloc(sizeof(s)+1);
-		command += strlen(s)+1;
-		strcpy(argv[i], s);
-	}
-	/*printf("the command is %d: ", argc);
-	for(i = 0; i < argc; i++)
-		printf("%s ", argv[i]);
-	printf("-----------end--------------");*/
-	return execute(argc, argv);
-}
 //to execute a dmsetup command, you need these data:argument number -- argc, argument array -- argv, and set the mark array _switches[] which
 //can be processed while execute a dmsetup command, or you can set it manually(not avaible now).
-/*PyObject *
-execute(PyObject *self, PyObject *pyargc, PyObject *pyargv)//this function is used to execute a C function
+static int execute_c(int argc, char **argv)//this function is used to execute a C function
 {
-	int argc;
-	PyArg_ParseTuple(pyargc, "i", &argc);
-	char **argv;
-	PyListToC(pyargv, &argv);
+	//printf("--------------------------Point 0------------------------------------");
 
 	struct command *c;
 	int r = 1;
@@ -995,10 +825,14 @@ execute(PyObject *self, PyObject *pyargc, PyObject *pyargv)//this function is us
 	} else
 		dev_dir = DEFAULT_DM_DEV_DIR;
 
+	//printf("--------------------------Point 1------------------------------------");
+
 	if (!_process_switches(&argc, &argv, dev_dir)) {
 		fprintf(stderr, "Couldn't process command line.\n");
 		goto out;
 	}
+
+	//printf("--------------------------Point 2------------------------------------");
 
 	if (_switches[VERSION_ARG]) {
 		c = _find_command("version");
@@ -1010,11 +844,15 @@ execute(PyObject *self, PyObject *pyargc, PyObject *pyargv)//this function is us
 		goto out;
 	}
 
+	//printf("--------------------------Point 3------------------------------------");
+
 	if (!(c = _find_command(argv[0]))) {
 		fprintf(stderr, "Unknown command\n");
 		_usage(stderr);
 		goto out;
 	}
+
+	//printf("--------------------------Point 4------------------------------------");
 
 	if (argc < c->min_args + 1 ||
 		(c->max_args >= 0 && argc > c->max_args + 1)) {
@@ -1027,6 +865,7 @@ execute(PyObject *self, PyObject *pyargc, PyObject *pyargv)//this function is us
 		//goto out;
 
 	  doit:
+
 	if (!c->fn(argc, argv, NULL)) {
 		fprintf(stderr, "Command failed\n");
 		goto out;
@@ -1044,12 +883,52 @@ out:
 		dm_tree_free(_dtree);
 
 	return 0;
-}*/
+}
+
+//get a command from python, convert it into C data structure and execute this command
+PyObject * Get_Command(PyObject *self, PyObject *args)
+{
+//--for test :-------------------------------------------------------
+//-------------------------------------------------------------------
+
+	int argc;
+	int ret;
+	int i;
+	char *argv[100];
+	PyObject *list;
+	PyObject *pystring;
+	Py_ssize_t listlen;
+
+	ret = PyArg_ParseTuple(args, "O!", &PyList_Type, &list);
+	if( -1 == ret )
+	{
+		printf("Get_Command: Parse arguments failed!\n");
+		return Py_BuildValue("i", 0);
+	}
+
+	argv[0] = (char *)malloc(sizeof(char[100]));
+	strcpy(argv[0], "dm");
+	listlen = PyList_Size(list);
+	argc = listlen;
+	for(i = 0; i < argc; i++)
+	{
+		argv[i+1] = (char *)malloc(sizeof(char[100]));
+		pystring = PyList_GetItem(list, i);
+		strcpy(argv[i+1], PyString_AsString(pystring));
+	}
+
+	if( !strcmp(argv[1], "info") )
+		_info(argc+1, argv, NULL);
+	else
+		execute_c(argc+1, argv);
+
+	return Py_BuildValue("i", 1);
+}
 
 //Define a methodlist which can be used in python, {NULL, NULL} means end
 static PyMethodDef dmfunctions[] = {
-	{"execute", (PyCFunction)execute, PYDM_ARGS, "execute a C function"},
-	{NULL, NULL, 0, NULL}
+	{"Get_Command", (PyCFunction)Get_Command, PYDM_ARGS, "get and execute a python command"},
+	{NULL, NULL}
 };
 
 //Initial a python module that can be used in python
@@ -1060,50 +939,7 @@ void initdm(void)
 	m = Py_InitModule("dm", dmfunctions);
 }
 
-int add(int a, int b)
-{
-	return a+b;
-}
-
-int minus(int a, int b)
-{
-	return a-b;
-}
-
-int ret(char * a)
-{
-	return strlen(a);
-}
-
-
 int main()
 {
-	Parse_Arg(4, "test create test /home/yongchuan/workspace/dmdebug/dmtable");
-	//Parse_Arg(3, "test remove test");
 	return 0;
 }
-
-
-/*
-int main()
-{
-	int i;
-	int argc;
-	char *argv[100];
-
-	//scanf("%d", &argc);
-
-	argc = 4;
-	for(i = 0; i < 4; i++)
-		argv[i] = (char *)malloc(sizeof(char[100]));
-	argv[1] = "create";
-	argv[2] = "test";
-	argv[3] = "/home/yongchuan/workspace/dmdebug/dmtable";
-
-	execute(argc, argv);
-
-	return 0;
-}
-*/
-
-
