@@ -1,17 +1,10 @@
-import redis, rpc, logging
-import messages_pb2 as msg
-import mds_mock
-import threading
+import logging, gevent.server
+import rpc, mds_mock
 
 logging.basicConfig(level=logging.DEBUG)
 
+server=mds_mock.MDS()
+service=rpc.RpcService(server)
 
-sched=rpc.Scheduler()
-stub=rpc.RpcStubCo(msg.Guid(), sched, mds_mock.MDS)
-server=mds_mock.MDS(stub)
-service=rpc.RpcServiceCo(sched, server)
-stub.setServiceCo(service)
-while True:
-	service.listen()
-	print "let's listen again"
-
+framework=gevent.server.StreamServer(('0.0.0.0', 2345), service.handler)
+framework.serve_forever()
