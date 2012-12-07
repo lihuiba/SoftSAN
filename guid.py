@@ -12,10 +12,10 @@ def toStr(x):
 
 def generate():
     ret=msg.Guid()
-    ret.a=random.randomint(0, 0xffffffff)
-    ret.b=random.randomint(0, 0xffffffff)
-    ret.c=random.randomint(0, 0xffffffff)
-    ret.d=random.randomint(0, 0xffffffff)
+    ret.a=random.randint(0, 0xffffffff)
+    ret.b=random.randint(0, 0xffffffff)
+    ret.c=random.randint(0, 0xffffffff)
+    ret.d=random.randint(0, 0xffffffff)
     return ret
 
 def fromStr(s):
