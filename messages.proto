@@ -94,37 +94,37 @@ message LoadInfo{
 }
 
 message ChunkServerInfo {                   //P2S message
-    optional MachineInfo machine=1;
-    repeated DiskInfo disks=2;
-    repeated ChunkInfo chunks=3;
-    optional LoadInfo load=4;
+    required string ServiceAddress=1;
+    required uint32 ServicePort=2;
+    optional MachineInfo machine=3;
+    repeated DiskInfo disks=4;
+    repeated ChunkInfo chunks=5;
+    optional LoadInfo load=6;
 }
 
-message NewChunk_Request {                  //P2SP message
+message GetChunkServers_Request {           //P2S message
+    optional uint32 randomCount=1;
+    repeated Guid specified=2;
+}
+
+message GetChunkServers_Response {
+    repeated ChunkServerInfo random=1;
+    repeated ChunkServerInfo specified=2;   
+}
+
+message NewChunk_Request {                  //P2P message
     required uint32 size=1;                 //in MB
-    optional Guid=2;                        //target server guid, (0,0,0,0) or NULL for default location
+    required uint32 count=2;                //number of chunks to create
+    optional Guid guid=3;                   //target device guid, (0,0,0,0) or NULL for default location
 }
 
 message NewChunk_Response {
     required uint32 size=1;                 //size of the created chunk
-    required Guid guid=2;                   //guid of the created chunk
+    repeated Guid guids=2;                   //guids of the created chunk
     optional string error=101;
 }
 
-message NewChunks_Request {
-    repeated NewChunk_Request requests=1;   //array of specified requests
-    optional uint32 count=2;                //number of simple batch creates
-    optional uint32 size=3;                 //size of simple batch creates, in MB
-}
-
-message NewChunks_Response {
-    repeated NewChunk_Response responses=1; //array of respones of specified requests
-    optional uint32 count=2;                //number of chunks that has been simple batch created
-    optional uint32 size=3;                 //size of chunks that has been simple batch created, in MB
-    optional string error=101;              //error that occurs during simple batch creation, when count<NewChunks_Request.count
-}
-
-message DeleteChunk_Request {               //P2SP message
+message DeleteChunk_Request {               //P2P message
     repeated Guid guids=1;                  //array of guids of the chunks to delete
 }
 
@@ -141,10 +141,6 @@ message Volume {
     required Guid guid=5;                   //A volume can have a name (guid), or reference a chunk
 }
 
-//message VolumePackage {
-//    required bytes volume=1;                //PB-encoded Volume as bytes
-//}
-
 message ReadVolume_Request {                //P2S message
     required string fullpath=1;
 }
@@ -160,16 +156,6 @@ message WriteVolume_Request {               //P2S message
 }
 
 message WriteVolume_Response {
-    optional string error=101;
-}
-
-message NewVolume_Request {                 //P2SP message
-    required string fullpath=1;
-    required uint32 mod=2;
-    optional bytes volume=3;                //PB-encoded Volume as bytes
-}
-
-message NewVolume_Response {
     optional string error=101;
 }
 
@@ -239,7 +225,7 @@ message DeleteVolume_Response {
 service MDSService {
     rpc NewChunk(NewChunk_Request)                   returns(NewChunk_Response);
     rpc DeleteChunk(DeleteChunk_Request)             returns(DeleteChunk_Response);
-    rpc NewVolume(NewVolume_Request)                 returns(NewVolume_Response);
+//    rpc NewVolume(NewVolume_Request)                 returns(NewVolume_Response);
     rpc AssembleVolume(AssembleVolume_Request)       returns(AssembleVolume_Response);
     rpc DisassembleVolume(DisassembleVolume_Request) returns(DisassembleVolume_Response);
 //    rpc RepairVolume(RepairVolume_Request)           returns(RepairVolume_Response);

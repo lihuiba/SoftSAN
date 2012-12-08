@@ -1,6 +1,8 @@
-import rpc, logging
+import rpc, logging, gevent.socket
 import messages_pb2 as msg
 import guid as Guid
+import random
+import ChkSvr_mock
 
 def myNewChunk(arg):
 	ret=msg.NewChunk_Response()
@@ -8,24 +10,39 @@ def myNewChunk(arg):
 	ret.guid.a=0x66
 	ret.guid.b=0x77
 	ret.guid.c=0x88
-	ret.guid.d=0x99	
+	ret.guid.d=0x99
 	return ret
 
 class MDS:
 	def __init__(self):
-		pass
+		self.registry={}
+		self.service=None
+		self.guid=Guid.generate()
+		self.stub=rpc.RpcStub(self.guid, None, ChkSvr_mock.ChunkServer)		
+	def _onConnectionClose_(self):
+		guid=self.service.peerGuid()
+		key=Guid.toTuple(guid)
+		if key in self.registry:
+			del self.registry[key]
 	def ChunkServerInfo(self, arg):
 		logging.debug(type(arg))
+		guid=self.service.peerGuid()
+		key=Guid.toTuple(guid)
+		self.registry[key]=arg
 	def NewChunk(self, arg):
 		print type(arg)
-		x=arg.location
-		if x.a==0 and x.b==0 and x.c==0 and x.d==0:
-			x.a=9; x.b=8; x.c=7; x.d=6;
-		print "Relay NewChunk to 9.8.7.6"
-		# ret0=self.stub.callMethod_on("NewChunk", arg, x)
-		ret0=myNewChunk(arg)
-		print "Got response from 9.8.7.6:", ret0
-		return ret0
+		guids=self.registry.keys()
+		x=random.choice(guids)
+		print "Relay NewChunk to ", x
+		ckinfo=self.registry[x]
+		socket=gevent.socket.socket()
+		socket.connect((ckinfo.ServiceAddress, ckinfo.ServicePort))
+		try:
+			ret=self.stub.callMethod("NewChunk", arg, socket)
+		finally:
+			socket.close()
+		print "Got response: ", ret
+		return ret
 	def DeleteChunk(self, arg):
 		print type(arg)
 		ret=msg.DeleteChunk_Response()

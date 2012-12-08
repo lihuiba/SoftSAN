@@ -1,6 +1,8 @@
 import redis, logging, random
 import messages_pb2 as msg
+import guid as Guid
 import rpc, transientdb
+import gevent.server
 
 class Object:
     def __init__(self, d=None):
@@ -34,7 +36,7 @@ def message2object(message):
         name=f[0].name
         value=f[1]
         if isinstance(value, msg.Guid):
-            value=guid2Str(value)
+            value=Guid.toStr(value)
         else:
             listable=getattr(value, 'ListFields', None)
             if listable:
@@ -48,60 +50,66 @@ def message2object(message):
 
 
 class MDS:
-    tdb=None
-    stub=None
-    def __init__(self, stub, transientdb):
-        self.stub=stub
+    def __init__(self, transientdb):
+        self.service=None
         self.tdb=transientdb
     def ChunkServerInfo(self, arg):
         logging.debug(type(arg))
         cksinfo=message2object(arg)
+        cksinfo.guid=Guid.toStr(self.service.peerGuid())
         self.tdb.putChunkServer(cksinfo)
-    def NewChunk(self, arg):
-        logging.debug(type(arg))
-        if isGuidZero(arg.location):
-            servers=self.tdb.getChunkServerList()
-            x=random.choice(servers)
-            x=guidFromStr(x)
-            guidAssign(arg.location, x)
-        logging.debug("NewChunk on chunk server %s", arg.location)
-        retv=self.stub.callMethod_on("NewChunk", arg, arg.location)
-        return retv    
-    def DeleteChunk(self, arg):
-        logging.debug(type(arg))
-        chunks=self.tdb.getChunks(arg.guids)
-        done=[]
-        for cgroup in splitbyattr(chunks, 'serverid'):
-            arg.guids.clear()
-            for c in cgroup:
-                guid=guidFromStr(c.guid)
-                arg.guids.add()
-                guidAssign(arg.guids[-1], guid)
-            ret=self.stub.callMethod_on("DeleteChunk", arg, cgroup[0].serverid)
-            done=done+ret.guids
-            if ret.error:
-                break;
-        ret.guids=done
+        print cksinfo.__dict__
+    def GetChunkServers(self, arg):
+        ret=msg.GetChunkServers_Response()
+        servers=self.tdb.getChunkServerList()
+        servers=self.tdb.getChunkServers(servers)
+        for s in servers:
+            print s.__dict__
+            ret.random.add()
+            t=ret.random[-1]
+            t.ServiceAddress=s.ServiceAddress
+            t.ServicePort=int(s.ServicePort)
         return ret
-    def NewVolume(self, arg):
-        logging.debug(type(arg))
-        ret=msg.NewVolume_Response()
-        return ret
-
-    def AssembleVolume(self, arg):
-        logging.debug(type(arg))
-        ret=msg.AssembleVolume_Response()
-        ret.access_point='no access_point'
-        return ret
-    def DisassembleVolume(self, arg):
-        logging.debug(type(arg))
-        ret=msg.DisassembleVolume_Response()
-        ret.access_point=arg.access_point
-        return ret
-    def RepairVolume(self, arg):
-        logging.debug(type(arg))
-        ret=msg.RepairVolume_Response()
-        return ret
+    # def NewChunk(self, arg):
+    #     logging.debug(type(arg))
+    #     if isGuidZero(arg.location):
+    #         servers=self.tdb.getChunkServerList()
+    #         x=random.choice(servers)
+    #         x=guidFromStr(x)
+    #         guidAssign(arg.location, x)
+    #     logging.debug("NewChunk on chunk server %s", arg.location)
+    #     retv=self.stub.callMethod_on("NewChunk", arg, arg.location)
+    #     return retv    
+    # def DeleteChunk(self, arg):
+    #     logging.debug(type(arg))
+    #     chunks=self.tdb.getChunks(arg.guids)
+    #     done=[]
+    #     for cgroup in splitbyattr(chunks, 'serverid'):
+    #         arg.guids.clear()
+    #         for c in cgroup:
+    #             guid=guidFromStr(c.guid)
+    #             arg.guids.add()
+    #             guidAssign(arg.guids[-1], guid)
+    #         ret=self.stub.callMethod_on("DeleteChunk", arg, cgroup[0].serverid)
+    #         done=done+ret.guids
+    #         if ret.error:
+    #             break;
+    #     ret.guids=done
+    #     return ret
+    # def AssembleVolume(self, arg):
+    #     logging.debug(type(arg))
+    #     ret=msg.AssembleVolume_Response()
+    #     ret.access_point='no access_point'
+    #     return ret
+    # def DisassembleVolume(self, arg):
+    #     logging.debug(type(arg))
+    #     ret=msg.DisassembleVolume_Response()
+    #     ret.access_point=arg.access_point
+    #     return ret
+    # def RepairVolume(self, arg):
+    #     logging.debug(type(arg))
+    #     ret=msg.RepairVolume_Response()
+    #     return ret
     def ReadVolume(self, arg):
         logging.debug(type(arg))
         ret=msg.ReadVolume_Response()
@@ -115,30 +123,27 @@ class MDS:
         logging.debug(type(arg))
         ret=msg.MoveVolume_Response()
         return ret
-    def ChMod(self, arg):
-        logging.debug(type(arg))
-        ret=msg.ChMod_Response()
-        return ret
+    # def ChMod(self, arg):
+    #     logging.debug(type(arg))
+    #     ret=msg.ChMod_Response()
+    #     return ret
     def DeleteVolume(self, arg):
         logging.debug(type(arg))
         ret=msg.DeleteVolume_Response()
         return ret
-    def CreateLink(self, arg):
-        logging.debug(type(arg))
-        ret=msg.CreateLink_Response()
-        return ret
+    # def CreateLink(self, arg):
+    #     logging.debug(type(arg))
+    #     ret=msg.CreateLink_Response()
+    #     return ret
 
 
 def test_main():
-    sched=rpc.Scheduler()
-    stub=rpc.RpcStubCo(msg.Guid(), sched, MDS)
     tdb=transientdb.TransientDB()
-    server=MDS(stub, tdb)
-    service=rpc.RpcServiceCo(sched, server)
-    stub.setServiceCo(service)
-    while True:
-        service.listen()
-        print "let's listen again"
+    server=MDS(tdb)
+    service=rpc.RpcService(server)
+    framework=gevent.server.StreamServer(('0.0.0.0', 2345), service.handler)
+    framework.serve_forever()
+
 
 def test_split():
     o1={ 'asdf':123, 'des':823}

@@ -1,4 +1,4 @@
-import logging
+import logging, inspect
 import messages_pb2 as msg
 import guid as Guid
 
@@ -23,7 +23,10 @@ class ServiceTerminated:
 def BuildMethodInfo(theServer):
 	ret={}
 	for func in dir(theServer):
-		if func.startswith('__'):
+		if func.startswith('_') or func.endswith('_'):
+			continue
+		target=getattr(theServer, func)
+		if not inspect.ismethod(target):
 			continue
 		req=getattr(msg, func+'_Request', None) or getattr(msg, func, type(None))
 		res=getattr(msg, func+'_Response', type(None))
@@ -56,14 +59,23 @@ class RpcService:
 	def __init__(self, Server, MethodInfo=None):
 		self.methodInfo=MethodInfo or BuildMethodInfo(Server)
 		self.theServer=Server
+		self.peerguid=None
+		self.cursocket=None
+		Server.service=self
 		logging.info(self.methodInfo.keys())
+	def peerGuid(self):
+		return self.peerguid
+	def currentSocket(self):
+		return self.cursocket
 	def handler(self, socket, address):
+		guid=None
 		try:
 			while True:
 				guid,token,name,body=recvRpc(socket)
+				self.peerguid=guid
+				self.cursocket=socket
 				MI=self.methodInfo[name]
 				argument=MI[0].FromString(body)
-				argument.guid=guid
 				method=getattr(self.theServer, name)
 				ret=method(argument)
 				assert type(ret)==MI[1]
@@ -73,9 +85,15 @@ class RpcService:
 				sendRpc(socket, guid, token, name, body)
 		except ServiceTerminated:
 			pass
+		finally:
+			if guid==None: return
+			if hasattr(self.theServer, '_onConnectionClose_'):
+				self.theServer._onConnectionClose_()
+
+
 
 class RpcStub:
-	def __init__(self, guid, socket, Interface=None, MethodInfo=None):
+	def __init__(self, guid, socket=None, Interface=None, MethodInfo=None):
 		if Interface==None and MethodInfo==None:
 			raise ValueError("At least provide an Interface or a MethodInfo")
 		self.socket=socket
@@ -86,12 +104,15 @@ class RpcStub:
 		else:
 			self.methodInfo=BuildMethodInfo(Interface)
 		logging.info(self.methodInfo.keys())
-	def callMethod(self, name, argument):
+	def callMethod(self, name, argument, socket=None):
 		MI=self.methodInfo[name]
 		assert type(argument)==MI[0]
 		body=argument.SerializeToString()
-		sendRpc(self.socket, self.guid, self.token, name, body)
-		guid,token,name_,body_ = recvRpc(self.socket)
+		socket = socket or self.socket
+		sendRpc(socket, self.guid, self.token, name, body)
+		if MI[1]==type(None):
+			return
+		guid,token,name_,body_ = recvRpc(socket)
 		assert guid==self.guid
 		assert token==self.token
 		assert name_==name

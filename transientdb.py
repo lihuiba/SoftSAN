@@ -3,17 +3,17 @@ import redis, logging
 
 def container(x):
     if isinstance(x, str):
-        return (x,)
+        return (x,),True
     if hasattr(x, '__iter__') or hasattr(x, '__getitem__'):
-        return x
+        return x,False
     else:
-        return (x,)
+        return (x,),True
 
-def uncontainer(x):
-    if len(x)!=1:
-        return x
-    else:
+def uncontainer(x, flag):
+    if flag:
         return x[0]
+    else:
+        return x
 
 class Object:
     def __init__(self, d=None):
@@ -26,7 +26,7 @@ class TransientDB:
     def __init__(self, redisc=None):
         self.rclient = redisc or redis.client.Redis()
     def putObjects(self, keyprefix, objects):
-        objects=container(objects)
+        objects,_=container(objects)
         for o in objects:
             key=keyprefix+o.guid
             if not isinstance(o, dict):
@@ -50,14 +50,15 @@ class TransientDB:
         self.putObjects('ChunkServer.', cksinfo)
         self.putChunks(cksguid, chunks)
     def putChunks(self, serverid, chunks):
-        chunks=container(chunks)
+        chunks,_=container(chunks)
         for c in chunks:
             c.server=serverid
         self.putObjects('Chunk.', chunks)
     def getObjects(self, keyprefix, objectids):
-        objectids=container(objectids)
+        objectids,flag=container(objectids)
+        print flag
         objects =[ Object(self.rclient.hgetall(keyprefix+id)) for id in objectids ]
-        return uncontainer(objects)
+        return uncontainer(objects, flag)
     def getChunkServers(self, serverids):
         return self.getObjects('ChunkServer.', serverids)
     def getChunks(self, chunkids):

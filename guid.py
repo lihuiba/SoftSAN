@@ -10,8 +10,19 @@ def isZero(x):
 def toStr(x):
     return "%08x-%08x-%08x-%08x" % (x.a, x.b, x.c, x.d)
 
-def generate():
+def toTuple(x):
+    return (x.a, x.b, x.c, x.d)
+
+def fromTuple(x):
     ret=msg.Guid()
+    ret.a=x.a
+    ret.b=x.b
+    ret.c=x.c
+    ret.d=x.d
+    return ret
+
+def generate(guid=None):
+    ret=guid or msg.Guid()
     ret.a=random.randint(0, 0xffffffff)
     ret.b=random.randint(0, 0xffffffff)
     ret.c=random.randint(0, 0xffffffff)

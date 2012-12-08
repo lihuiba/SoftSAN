@@ -18,10 +18,7 @@ stub=rpc.RpcStub(guid, socket, mds_mock.MDS)
 
 arg=msg.NewChunk_Request()
 arg.size=32
-arg.location.a=0
-arg.location.b=0
-arg.location.c=0
-arg.location.d=0
+arg.count=1
 ret=stub.callMethod('NewChunk', arg)
 print ret
 
