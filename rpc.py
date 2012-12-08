@@ -63,6 +63,7 @@ class RpcService:
 				guid,token,name,body=recvRpc(socket)
 				MI=self.methodInfo[name]
 				argument=MI[0].FromString(body)
+				argument.guid=guid
 				method=getattr(self.theServer, name)
 				ret=method(argument)
 				assert type(ret)==MI[1]

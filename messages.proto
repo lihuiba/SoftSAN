@@ -94,22 +94,34 @@ message LoadInfo{
 }
 
 message ChunkServerInfo {                   //P2S message
-    required Guid guid=1;
-    optional MachineInfo machine=2;
-    repeated DiskInfo disks=3;
-    repeated ChunkInfo chunks=4;
-    optional LoadInfo load=5;
+    optional MachineInfo machine=1;
+    repeated DiskInfo disks=2;
+    repeated ChunkInfo chunks=3;
+    optional LoadInfo load=4;
 }
 
 message NewChunk_Request {                  //P2SP message
     required uint32 size=1;                 //in MB
-    optional Guid location=2;               //target server guid, or (0,0,0,0) for any location
+    optional Guid=2;                        //target server guid, (0,0,0,0) or NULL for default location
 }
 
 message NewChunk_Response {
     required uint32 size=1;                 //size of the created chunk
     required Guid guid=2;                   //guid of the created chunk
     optional string error=101;
+}
+
+message NewChunks_Request {
+    repeated NewChunk_Request requests=1;   //array of specified requests
+    optional uint32 count=2;                //number of simple batch creates
+    optional uint32 size=3;                 //size of simple batch creates, in MB
+}
+
+message NewChunks_Response {
+    repeated NewChunk_Response responses=1; //array of respones of specified requests
+    optional uint32 count=2;                //number of chunks that has been simple batch created
+    optional uint32 size=3;                 //size of chunks that has been simple batch created, in MB
+    optional string error=101;              //error that occurs during simple batch creation, when count<NewChunks_Request.count
 }
 
 message DeleteChunk_Request {               //P2SP message

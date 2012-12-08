@@ -1,4 +1,4 @@
-import redis, rpc, logging
+import rpc, logging
 import messages_pb2 as msg
 import mds_mock
 import gevent.socket
@@ -6,7 +6,7 @@ import gevent.socket
 logging.basicConfig(level=logging.DEBUG)
 
 socket=gevent.socket.socket()
-socket.connect(('0.0.0.0', 2345))
+socket.connect(('localhost', 2345))
 
 
 guid=msg.Guid()
