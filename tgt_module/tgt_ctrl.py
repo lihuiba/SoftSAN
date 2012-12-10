@@ -64,6 +64,14 @@ class Tgt:
 	            out = 'lunindex:'+lun.index+','+'blocksize:'+lun.blocksize+','+'size:'+lun.size+','+'path:'+lun.backing_store_path
 	            print '|'+out.ljust(90)+'|'
 	    print '|'+''.ljust(90,'-')+'|'
+
+	def path2target_id(self, path):
+		for target in self.targetlist:
+			for lun in target.lunlist:
+				if cmp(lun.backing_store_path, path)==0:
+					target_id = target.id
+					return target_id
+		return None
 	    
 	def new_target(self, target_id, target_name):
 	    argv = list()

@@ -18,6 +18,7 @@ class my_LVM(LVM):
 		argv.append(VGCHANGE_BIN_PATH)
 		argv.append('-a y')
 		argv.append(vgname)
+		print argv
 		(status, output) = process_call_argv(argv)
 		if status != 0:
 			print "error activate VG"

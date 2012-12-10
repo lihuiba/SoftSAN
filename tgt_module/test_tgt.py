@@ -2,9 +2,19 @@ from tgt_ctrl import *
 
 if __name__ == '__main__':
 	tgt = Tgt()
-	# # tgt_ctrl.reload()
-	# tgt_ctrl.new_target('11','test:iscsi')
-	# tgt_ctrl.bind_target('11','ALL')
-	# tgt_ctrl.new_lun('11','1','/dev/vg0/lv0')
+	target_id = '4'
+	target_name = 'iqn:test'
+	acl = 'ALL'
+	lun_index = '1'
+	path = '/dev/VolGroup/lvtest'
+
+	# test new target, new lun, bind target
+	# tgt.new_target(target_id, target_name)
+	# tgt.bind_target(target_id, acl)
+	# tgt.new_lun(target_id, lun_index, path)
+
 	tgt.reload()
 	tgt.print_out()
+
+	# test path2target_id
+	# print tgt.path2target_id(path)
