@@ -56,7 +56,6 @@ class TransientDB:
         self.putObjects('Chunk.', chunks)
     def getObjects(self, keyprefix, objectids):
         objectids,flag=container(objectids)
-        print flag
         objects =[ Object(self.rclient.hgetall(keyprefix+id)) for id in objectids ]
         return uncontainer(objects, flag)
     def getChunkServers(self, serverids):

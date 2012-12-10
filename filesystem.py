@@ -29,14 +29,17 @@ class FileSystem:
     def rm(self, path):
         """remove a file"""
         raise NotImplementedError( "Should have implemented this" )
+    def stat(self, path):
+        """stat"""
+        raise NotImplementedError( "Should have implemented this" )
     def exists(self, path):
         """to check whether a file or directory exists"""
         raise NotImplementedError( "Should have implemented this" )
     def mkdir(self, path, p):
         """mkdir, optionally recursively (if p)"""
         raise NotImplementedError( "Should have implemented this" )
-    def rmdir(self, path, f, r):
-        """remove a directory, optionally forcing remove a non-empty dir (if f), and recursively (if r)"""
+    def rmdir(self, path, fr):
+        """remove a directory, optionally recursively forcing remove a non-empty dir (if fr)"""
         raise NotImplementedError( "Should have implemented this" )
     def mv(self, src, dest):
         """move a file/dir to another place"""
@@ -46,8 +49,9 @@ class FileSystem:
         if not path.startswith('/'):
             raise ValueError("relative path is not allowed!")
         p=path
-        while len(p)>1:
+        while True:
             p,n=os.path.split(p)
+            if n=='': break
             if n.startswith('.') or n.startswith('__'):
                 raise ValueError("file/directory names can NOT start with '.' or '__'.")
     @staticmethod
@@ -110,13 +114,21 @@ class FileSystemNaked(FileSystem):
         apath=self.root+path
         ret=os.path.exists(apath)
         return ret
+
+    @overrides(FileSystem)
+    def stat(self, path):
+        logging.debug("@stat: "+path)
+        self.check_path(path)
+        apath=self.root+path
+        ret=os.stat(apath)
+        return ret
     
     @overrides(FileSystem)
-    def mkdir(self, path, r=None):
-        logging.debug("@mkdir (-r=={0}): '{1}'".format(r, path))
+    def mkdir(self, path, p=None):
+        logging.debug("@mkdir (-p=={0}): '{1}'".format(p, path))
         self.check_path(path)
         apath=self.root+path               #absolute path
-        if r:
+        if p:
             os.makedirs(apath)
         else:
             os.mkdir(apath)

@@ -1,8 +1,8 @@
-import redis, logging, random
+import logging, random
 import messages_pb2 as msg
 import guid as Guid
-import rpc, transientdb
-import gevent.server
+import transientdb
+import persistentdb
 
 class Object:
     def __init__(self, d=None):
@@ -48,13 +48,22 @@ def message2object(message):
         setattr(rst, name, value)
     return rst
 
+def object2message(object, message):
+    if isinstance(object, dict):
+        d=object
+    else:
+        d=object.__dict__
+    for key in d.keys():
+        if key.startswith('_'):
+            continue
+        setattr(message, key, d[key])
 
 class MDS:
-    def __init__(self, transientdb):
+    def __init__(self, transientdb, persistentdb):
         self.service=None
         self.tdb=transientdb
+        self.pdb=persistentdb
     def ChunkServerInfo(self, arg):
-        logging.debug(type(arg))
         cksinfo=message2object(arg)
         cksinfo.guid=Guid.toStr(self.service.peerGuid())
         self.tdb.putChunkServer(cksinfo)
@@ -111,35 +120,58 @@ class MDS:
     #     ret=msg.RepairVolume_Response()
     #     return ret
     def ReadVolume(self, arg):
-        logging.debug(type(arg))
         ret=msg.ReadVolume_Response()
-        ret.volume.size=0
+        ret.volume=self.pdb.read(arg.fullpath)
         return ret
     def WriteVolume(self, arg):
-        logging.debug(type(arg))
         ret=msg.WriteVolume_Response()
+        self.pdb.write(arg.fullpath, arg.volume)
         return ret
     def MoveVolume(self, arg):
-        logging.debug(type(arg))
         ret=msg.MoveVolume_Response()
+        self.pdb.move(arg.source, arg.destination)
         return ret
     # def ChMod(self, arg):
-    #     logging.debug(type(arg))
     #     ret=msg.ChMod_Response()
     #     return ret
     def DeleteVolume(self, arg):
-        logging.debug(type(arg))
         ret=msg.DeleteVolume_Response()
+        self.pdb.delete(arg.fullpath)
         return ret
+    def CreateDirectory(self, arg):
+        ret=msg.CreateDirectory_Response()
+        self.pdb.createDirectory(arg.fullpath, arg.parents)
+        return ret
+    def DeleteDirectory(self, arg):
+        ret=msg.DeleteDirectory_Response()
+        self.pdb.deleteDirectory(arg.fullpath, arg.recursively_forced)
+        return ret
+    def ListDirectory(self, arg):
+        ret=msg.ListDirectory_Response()
+        listdir=self.pdb.listDirectory(arg.fullpath)
+        for item in listdir:
+            it=ret.items.add()
+            object2message(item, it)
+        return ret
+
+
     # def CreateLink(self, arg):
-    #     logging.debug(type(arg))
     #     ret=msg.CreateLink_Response()
     #     return ret
 
+#############################################################################
+
+def buildMDS():
+    import filesystem
+    testdir=filesystem.test_prepare_dir('/mds')
+    pdb=persistentdb.PersistentDB(testdir)
+    tdb=transientdb.TransientDB()
+    server=MDS(tdb, pdb)
+    return server    
 
 def test_main():
-    tdb=transientdb.TransientDB()
-    server=MDS(tdb)
+    import gevent.server, rpc
+    server=buildMDS()
     service=rpc.RpcService(server)
     framework=gevent.server.StreamServer(('0.0.0.0', 2345), service.handler)
     framework.serve_forever()
@@ -154,7 +186,36 @@ def test_split():
         for c in group:
             print c.__dict__
 
+def test():
+    server=buildMDS()
+    arg=Object()
+    arg.fullpath='/asdf'
+    arg.volume='hahahahha'
+    ret=server.WriteVolume(arg)
+    print ret
+    ret=server.ReadVolume(arg)
+    print ret
+    arg=Object()
+    arg.fullpath='/nnd/kkk/mdk'
+    arg.parents=True
+    ret=server.CreateDirectory(arg)
+    print ret
+    arg.fullpath='/mds'
+    ret=server.CreateDirectory(arg)
+    print ret
+    arg=Object()
+    arg.fullpath='/'
+    ret=server.ListDirectory(arg)
+    print ret
+    arg.fullpath='/nnd'
+    arg.recursively_forced=True
+    ret=server.DeleteDirectory(arg)
+    print ret
+
+
+
 if __name__=="__main__":
     logging.basicConfig(level=logging.DEBUG)
-    test_main()
+    #test_main()
     #test_split()
+    test()

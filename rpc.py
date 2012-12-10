@@ -1,4 +1,4 @@
-import logging, inspect
+import logging, inspect, sys, traceback
 import messages_pb2 as msg
 import guid as Guid
 
@@ -67,6 +67,19 @@ class RpcService:
 		return self.peerguid
 	def currentSocket(self):
 		return self.cursocket
+	@staticmethod
+	def callMethod(method, argument, rettype):
+		ret=None
+		logging.debug(type(argument))
+		try:
+			ret=method(argument)
+			assert type(ret)==rettype
+		except:
+			ret=rettype()
+			if hasattr(ret, 'error'):
+				ret.error=sys.exc_info()[0]
+			logging.error("exception ", exc_info=1)
+		return ret
 	def handler(self, socket, address):
 		guid=None
 		try:
@@ -77,10 +90,8 @@ class RpcService:
 				MI=self.methodInfo[name]
 				argument=MI[0].FromString(body)
 				method=getattr(self.theServer, name)
-				ret=method(argument)
-				assert type(ret)==MI[1]
-				if ret==None: 
-					continue
+				ret=self.callMethod(method, argument, MI[1])
+				if ret==None: continue
 				body=ret.SerializeToString()
 				sendRpc(socket, guid, token, name, body)
 		except ServiceTerminated:
