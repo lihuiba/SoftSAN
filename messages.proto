@@ -105,7 +105,7 @@ message AssembleVolume_Request {            //P2P message
 }
 
 message AssembleVolume_Response {
-    required string access_point=1;
+    optional string access_point=1;
     repeated string APs=2;                  // all the access points, if results in more than one.
     optional string error=101;
 }
