@@ -36,7 +36,7 @@ class Tgt:
 				match=pattern[0].match(line)
 				if match:
 					g=match.groups()
-					pattern[1](g)
+					pattern[1](*g)
 			try:
 				(key,value)=line.split(': ')
 			except:
@@ -45,18 +45,13 @@ class Tgt:
 				lun=self.targetlist[-1].lunlist[-1]
 				setattr(lun, key, value)
 
-	def newTarget(self, group):
-		id=group[0]
-		iqn=group[1]
+	def newTarget(self, id, iqn):
 		t=Target(id, iqn)
 		self.targetlist.append(t)
-	def newLun(self, group):
-		id=group[0]
+	def newLun(self, id):
 		lun=Lun(id)
 		self.targetlist[-1].lunlist.append(lun)
-	def setSize(self, group):
-		lunsize=group[0]
-		blocksize=group[1]
+	def setSize(self, lunsize, blocksize):
 		lun=self.targetlist[-1].lunlist[-1]
 		lun.size=lunsize
 		lun.blocksize=blocksize
