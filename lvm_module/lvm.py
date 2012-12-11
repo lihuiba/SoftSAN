@@ -53,14 +53,14 @@ class LVM:
 			argv.append("-n")		
 			argv.append(lvname)
 			argv.append(vg.name)
-			print argv
 			# execute command
 			(status, output) = process_call_argv(argv)
 			if status != 0:
-				print "error creating LV"
+				print output
 				return output
 			print output
 			return None
+		print "Invalid Size!"
 		return "Invalid Size!"
 
 

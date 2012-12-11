@@ -37,42 +37,46 @@ def heartBeat():
 class ChunkServer:
 
 	def __init__(self):
-		self.chklist = {}
+		self.chk_dic = {}
+
 		self.tgt = Tgt()
 		self.lvm = my_LVM()
 		self.tgt.reload()
 		self.lvm.reload()
 	
-	
+# chkserv always uses lun_index=1. if the requested volume does notchkserv 
 	def AssembleVolume(self, req):
 		ret = msg.AssembleVolume_Response()
-		if True:
-			a_guid = req.volume.guid
-			target_id = str(a_guid.a)
-			target_name = "iqn:softsan_"+Guid.toStr(a_guid)
-			acl = 'ALL'
-			lun_index = '1'
-			lv_name = LVNAME+Guid.toStr(a_guid)
-			lun_path = '/dev/'+VGNAME+'/'+lv_name
-			self.tgt.new_target(target_id, target_name)
-			self.tgt.bind_target(target_id, acl)
-			self.tgt.new_lun(target_id, lun_index, lun_path)
-			self.tgt.reload()			
-			ret.access_point = target_name
-		else:
-			ret.error = 'error'
+		a_guid = req.volume.guid
+		if self.chk_dic.get(a_guid)==None:
+			ret.error = ('incorrect guid:'+Guid.tostr(a_guid))
+			return ret
+		target_id = str(a_guid.a)
+		target_name = "iqn:softsan_"+Guid.toStr(a_guid)
+		acl = 'ALL'
+		lun_index = '1'
+		lv_name = LVNAME+Guid.toStr(a_guid)
+		lun_path = '/dev/'+VGNAME+'/'+lv_name
+		self.tgt.new_target(target_id, target_name)
+		self.tgt.bind_target(target_id, acl)
+		self.tgt.new_lun(target_id, lun_index, lun_path)
+		self.tgt.reload()			
+		ret.access_point = target_name
 		return ret
 
+# why DisassembleVolume_Response return the value of access_point? keep consistent with request
 	def DisassembleVolume(self, req):
-		
-		self.tgt.reload()
-		lun_path = req.access_point
-		target_id = self.tgt.path2target_id(lun_path)
-		self.tgt.delete_target(target_id)
 		ret = msg.DisassembleVolume_Response()
-		ret.access_point = lun_path
+		ret.access_point = req.access_point
+		self.tgt.reload()
+		target_name = req.access_point
+		target_id = self.tgt.path2target_id(target_name)
+		if target_id==None;
+			ret.error='No such access_point'
+		self.tgt.delete_target(target_id)
 		return ret
 
+# try to create every requested chunk.however, if some chunk can not be created, fill the ret.error with the output of lvcreate 
 	def NewChunk(self, req):
 		ret = msg.NewChunk_Response()
 		size = str(req.size)+'M'
@@ -80,29 +84,32 @@ class ChunkServer:
 			a_guid = Guid.generate()
 			lv_name = LVNAME+Guid.toStr(a_guid)
 			lv_size = size
-			self.lvm.my_create_lv(VGNAME, lv_name, lv_size)
-			self.lvm.print_out()
-			ret.guids.add()
-			Guid.assign(ret.guids[-1], a_guid)
-			self.chklist[a_guid]='lv'
+			output =  self.lvm.my_create_lv(VGNAME, lv_name, lv_size)
+			if output==None:
+				self.lvm.print_out()
+				ret.guids.add()
+				Guid.assign(ret.guids[-1], a_guid)
+				self.chk_dic[a_guid]='logical volume'
+			else: 
+				ret.error = str(i) + ':' + output + ' '
+				continue
 		self.lvm.load()
 		return ret
 
+# try to delete every requested chunk. if it can not delete, fill the ret.error with output of lvremove
 	def DeleteChunk(self, req):
 		ret = msg.DeleteChunk_Response()
-		#  what should i do if the deleted volumes have different size?
 		for a_guid in req.guids:
-			self.lvm.load()
-			self.lvm.print_out()
 			lv_name = LVNAME+Guid.toStr(a_guid)
 			lv_path = '/dev/'+VGNAME+'/'+lv_name
-			self.lvm.my_remove_lv(lv_path)
-			del self.chklist[a_guid]
+			output = self.lvm.my_remove_lv(lv_path)
+			if output==None:
+				del self.chk_dic[a_guid]
+			else:
+				error += Guid.toStr(a_guid)+':'+output+' '
+				ret.error += error
 		self.lvm.load()
 		return ret
-
-	
-
 
 if __name__=='__main__':
 	# guid=msg.Guid()

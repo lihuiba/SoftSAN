@@ -6,3 +6,8 @@ def gethostname(mdsip):
 	hostname=s.getsockname()[0]
 	s.close()
 	return hostname
+
+
+
+if __name__ == '__main__':
+	print gethostname('www.bing.com')

@@ -3,7 +3,6 @@ from objects_tgt import *
 from process_call import *
 import re
 
-
 def buildArguments(mode, op, **kwargs):
 	ret=["tgtadm", "--lld", "iscsi", "--mode", mode, "--op", op]
 	for key in kwargs:
@@ -56,6 +55,7 @@ class Tgt:
 		lun.size=lunsize
 		lun.blocksize=blocksize
 
+
 	def reload(self):
 	    argv = list()
 	    argv.append("tgtadm")
@@ -65,8 +65,7 @@ class Tgt:
 	    argv.append("target")
 	    argv.append("--op")
 	    argv.append("show")
-
-	    argv=buildArguments(mode='target', op='show')
+   	    # argv=buildArguments(mode='target', op='show')
 
 	    # list target and lun
 	    (status, output) = process_call_argv(argv)
@@ -78,14 +77,14 @@ class Tgt:
 	    n_tgt = 0
 	    n_lun = 0
 	    # loop = 0
-	    for line in output.splitlines():##############################splitlines
+	    for line in output.splitlines():
 	        # loop = loop+1
 	        if line.find('Target') != -1:
 	            n_tgt = n_tgt + 1
 	            n_lun = 0
 	            strlist = line.split(':',1)
 	            target_id = filter(str.isdigit,strlist[0])
-	            target_name = strlist[1]
+	            target_name = strlist[1].strip()
 	            self.targetlist.append(Target(target_id, target_name))
 
 	        elif line.find('LUN:') != -1:
@@ -122,6 +121,13 @@ class Tgt:
 					target_id = target.id
 					return target_id
 		return None
+
+	def target_name2target_id(self, target_name):
+		for target in self.targetlist:
+			if cmp(target.name, target_name)==0:
+				return target.id
+		return None
+
 	    
 	def new_target(self, target_id, target_name):
 	    argv = list()
