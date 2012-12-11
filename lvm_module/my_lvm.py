@@ -107,7 +107,8 @@ class my_LVM(LVM):
 
 	def my_create_lv(self, vgname, lvname, size):
 		vg = self.get_vgname(vgname)
-		self.create_lv(vg, lvname, size)
+		output = self.create_lv(vg, lvname, size)
+		return output 	
 
 	def my_extend_lv(self, lvpath, alter_size):
 		unit = alter_size[-1:]
@@ -148,16 +149,13 @@ class my_LVM(LVM):
 	def my_remove_lv(self, lvpath):
 		argv = list()
 		argv.append(LVREMOVE_BIN_PATH)
-		#argv.append("-t")
 		argv.append("-f")
 		argv.append(lvpath)
-		
 		# execute command
 		(status, output) = process_call_argv(argv)
-		if status != 0:
-			print "error remove lv"
-			return output
 		print output
+		if status != 0:			
+			return output
 		return None
 
 

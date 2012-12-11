@@ -15,6 +15,11 @@ if __name__ == '__main__':
 
 	tgt.reload()
 	tgt.print_out()
+	out = tgt.target_name2target_id('iqn:test')
+	if out==None:
+		print 'no cmp'
+	else:
+		print 'id = '+out
 
 	# test path2target_id
 	# print tgt.path2target_id(path)
