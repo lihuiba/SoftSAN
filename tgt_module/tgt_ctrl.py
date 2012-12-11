@@ -2,6 +2,18 @@
 from objects_tgt import *
 from process_call import *
 
+
+def buildArguments(mode, op, **kwargs):
+	ret=["tgtadm", "--lld", "iscsi", "--mode", mode, "--op", op]
+	for key in kwargs:
+		if len(key)>1:
+			skey='--'+key
+		else:
+			skey='-'+key
+		ret.append(skey)
+		ret.append(str(kwargs[key]))
+	return ret
+
 class Tgt:
 	'''
         attribute: targetlist
@@ -18,6 +30,9 @@ class Tgt:
 	    argv.append("target")
 	    argv.append("--op")
 	    argv.append("show")
+
+	    argv=buildArguments(mode='target', op='show')
+
 	    # list target and lun
 	    (status, output) = process_call_argv(argv)
 	    if status != 0:
@@ -28,7 +43,7 @@ class Tgt:
 	    n_tgt = 0
 	    n_lun = 0
 	    # loop = 0
-	    for line in output.splitlines():
+	    for line in output.splitlines():##############################splitlines
 	        # loop = loop+1
 	        if line.find('Target') != -1:
 	            n_tgt = n_tgt + 1
