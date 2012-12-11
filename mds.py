@@ -216,6 +216,6 @@ def test():
 
 if __name__=="__main__":
     logging.basicConfig(level=logging.DEBUG)
-    #test_main()
+    test_main()
     #test_split()
-    test()
+    #test()

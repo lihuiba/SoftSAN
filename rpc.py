@@ -51,22 +51,22 @@ def recvRpc(s):
 	body=fd.read(size)
 	fd.close()
 	if len(body)!=size:
-		s.close()
-		raise IOError('invalid request')
+		raise IOError('Invalid rpc message')
 	return guid,token,name,body
 
 class RpcService:
 	def __init__(self, Server, MethodInfo=None):
-		self.methodInfo=MethodInfo or BuildMethodInfo(Server)
 		self.theServer=Server
 		self.peerguid=None
 		self.cursocket=None
 		Server.service=self
+		self.methodInfo=MethodInfo or BuildMethodInfo(Server)
 		logging.info(self.methodInfo.keys())
 	def peerGuid(self):
 		return self.peerguid
 	def currentSocket(self):
 		return self.cursocket
+	
 	@staticmethod
 	def callMethod(method, argument, rettype):
 		ret=None
@@ -80,20 +80,29 @@ class RpcService:
 				ret.error=sys.exc_info()[0]
 			logging.error("exception ", exc_info=1)
 		return ret
+	
+	def doService(self, socket):
+		guid,token,name,body=recvRpc(socket)
+		self.peerguid=guid
+		self.cursocket=socket
+		try:
+			MI=self.methodInfo[name]
+			argument=MI[0].FromString(body)
+			method=getattr(self.theServer, name)
+			ret=self.callMethod(method, argument, MI[1])
+			if ret==None: return
+			body=ret.SerializeToString()
+		except:
+			name='Exception'
+			exctype,value = sys.exc_info()[:2]
+			body="{0}\n{1}".format(value.__class__.__name__, value)
+		sendRpc(socket, guid, token, name, body)		
+	
 	def handler(self, socket, address):
 		guid=None
 		try:
 			while True:
-				guid,token,name,body=recvRpc(socket)
-				self.peerguid=guid
-				self.cursocket=socket
-				MI=self.methodInfo[name]
-				argument=MI[0].FromString(body)
-				method=getattr(self.theServer, name)
-				ret=self.callMethod(method, argument, MI[1])
-				if ret==None: continue
-				body=ret.SerializeToString()
-				sendRpc(socket, guid, token, name, body)
+				self.doService(socket)
 		except ServiceTerminated:
 			pass
 		finally:
@@ -121,11 +130,12 @@ class RpcStub:
 		body=argument.SerializeToString()
 		socket = socket or self.socket
 		sendRpc(socket, self.guid, self.token, name, body)
-		if MI[1]==type(None):
-			return
+		if MI[1]==type(None): return
 		guid,token,name_,body_ = recvRpc(socket)
 		assert guid==self.guid
 		assert token==self.token
+		if name_=='Exception':
+			raise Exception(body)
 		assert name_==name
 		self.token=token+1
 		ret=MI[1].FromString(body_)
