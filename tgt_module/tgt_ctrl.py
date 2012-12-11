@@ -1,6 +1,7 @@
 #/usr/sbin/
 from objects_tgt import *
 from process_call import *
+import re
 
 
 def buildArguments(mode, op, **kwargs):
@@ -20,6 +21,45 @@ class Tgt:
     '''
 	def __init__(self, targetlist=None):
 		self.targetlist = targetlist or []
+		self.table1=[
+			(re.compile(r'^Target (\d*): (.*)$'),			self.newTarget),
+			(re.compile(r'^LUN: (\d*)$'), 					self.newLun),
+			(re.compile(r'^Size: (.*), Block size: (.*)$'),	self.setSize),
+		]
+		self.table2=['SCSI ID', 'SCSI SN', 'Online', 'Removable media', 'Prevent removal', \
+		'Readonly', 'Backing store type', 'Backing store path', 'Backing store flags']
+
+	def parseLines(self, lines):
+		for line in lines:
+			line=line.strip()
+			for pattern in self.table1:
+				match=pattern[0].match(line)
+				if match:
+					g=match.groups()
+					pattern[1](g)
+			try:
+				(key,value)=line.split(': ')
+			except:
+				continue
+			if key in self.table2:
+				lun=self.targetlist[-1].lunlist[-1]
+				setattr(lun, key, value)
+
+	def newTarget(self, group):
+		id=group[0]
+		iqn=group[1]
+		t=Target(id, iqn)
+		self.targetlist.append(t)
+	def newLun(self, group):
+		id=group[0]
+		lun=Lun(id)
+		self.targetlist[-1].lunlist.append(lun)
+	def setSize(self, group):
+		lunsize=group[0]
+		blocksize=group[1]
+		lun=self.targetlist[-1].lunlist[-1]
+		lun.size=lunsize
+		lun.blocksize=blocksize
 
 	def reload(self):
 	    argv = list()
@@ -192,3 +232,17 @@ class Tgt:
 	        return output
 	    print output
 	    return None
+
+
+
+if __name__=="__main__":
+	lines=open('t.txt').readlines()
+	t=Tgt()
+	t.parseLines(lines)
+	for target in t.targetlist:
+		print target.__dict__
+		for lun in target.lunlist:
+			print '\t', lun
+			for key in lun.__dict__:
+				print '\t\t',key,': ',lun.__dict__[key]
+
