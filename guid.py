@@ -7,6 +7,9 @@ def assign(x, y):
 def isZero(x):
     return (x.a==0 and x.b==0 and x.c==0 and x.d==0)
 
+def setZero(x):
+    x.a=0; x.b=0; x.c=0; x.d=0
+
 def toStr(x):
     return "%08x-%08x-%08x-%08x" % (x.a, x.b, x.c, x.d)
 
