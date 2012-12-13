@@ -78,11 +78,9 @@ class Tgt:
 	def reload(self):
 	    argv = list()
 	    argv=buildArguments(mode='target', op='show')
-	    # print argv
-	    (status, output) = process_call_argv(argv)
-	    # print output
+	    (status, output) = process_reload_argv(argv)
 	    self.targetlist = []
-	    self.parseLines(output.splitlines())
+	    self.parseLines(output)
 	    if status != 0:
 	        print "error occur reload target"
 	    return output
@@ -161,6 +159,7 @@ if __name__=="__main__":
 
 	t=Tgt()
 	print '     test begin     '.center(100,'*')
+	print 
 	t.reload()
 	t.print_out()
 	# print len(t.targetlist[0].lunlist)
@@ -169,4 +168,7 @@ if __name__=="__main__":
 	# 		print '\t', lun
 	# 		for key in lun.__dict__:
 	# 			print '\t\t',key,': ',lun.__dict__[key]
+	print 
+	print '     test end     '.center(100,'*')
+	 
 

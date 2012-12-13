@@ -11,21 +11,21 @@ class Target:
 
 class Lun:
 
-    def __init__(self, index='1', type='controller', scsi_id='IET     000x000y', scsi_sn='beaf00', size=0,  blocksize=1, backing_store_path=None,\
-        online=True, Removable_media=False, Prevent_removal=False, readonly=False,  backing_store_type='null', backing_store_flags=None):
-        self.index = index
-        self.type = type
-        self.scsi_id = scsi_id
-        self.scsi_sn = scsi_sn
-        self.size = size
-        self.blocksize = blocksize
-        self.backing_store_path = backing_store_path
+    def __init__(self, index='1', type=None, scsi_id=None, scsi_sn=None, size=None,  blocksize=None, backing_store_path='',\
+        online='YES', Removable_media='NO', Prevent_removal='NO', readonly='NO',  backing_store_type='null', backing_store_flags=None):
+        self.index = index 
+        self.type = type or ''
+        self.scsi_id = scsi_id or ''
+        self.scsi_sn = scsi_sn or ''
+        self.size = size or ''
+        self.blocksize = blocksize or ''
+        self.backing_store_path = backing_store_path or ''
         self.online = online
         self.Removable_media = Removable_media
         self.Prevent_removal = Prevent_removal
         self.Readonly = readonly
         self.backing_store_type = backing_store_type
-        self.backing_store_flags = backing_store_flags
+        self.backing_store_flags = backing_store_flags or ''
 
 
 

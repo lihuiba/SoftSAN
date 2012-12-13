@@ -12,11 +12,12 @@ if __name__ == '__main__':
 	# test new target, new lun, bind target
 	tgt.new_target(target_id, target_name)
 	tgt.bind_target(target_id, acl)
-	tgt.new_lun('30', lun_index, path)
+	tgt.new_lun(target_id, lun_index, path)
 
-	for i in range(20,31):
-		target_id = str(i)
-		tgt.delete_target(target_id)
+	# for i in range(20,31):
+	# 	target_id = str(i)
+	# 	tgt.delete_target(target_id)
+		
 	tgt.reload()
 	tgt.print_out()
 	
