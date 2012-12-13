@@ -103,54 +103,60 @@ class Tgt:
 	    argv = list()
 	    argv=buildArguments(mode='target', op='new', tid=target_id, T=target_name)
 	    (status, output) = process_call_argv(argv)
-	    print output
 	    if status != 0:
+	    	print output
 	        return output
+	    print '  new target successfully, target id:',target_id
 	    return None
 
 	def bind_target(self, target_id, acl='ALL'):
 	    argv = list()
 	    argv=buildArguments(mode='target', op='bind', tid=target_id, I=acl)
 	    (status, output) = process_call_argv(argv)
-	    print output
 	    if status != 0:
+	    	print output
 	        return output
+	    print '  bind target successfully, target id:', target_id
 	    return None
 
 	def unbind_target(self, target_id, acl='ALL'):
 	    argv = list()
 	    argv=buildArguments(mode='target', op='unbind', tid=target_id, I=acl)
 	    (status, output) = process_call_argv(argv)
-	    print output
 	    if status != 0:
 	        return output
+       	    print output
+	    print '  bind target successfully, target id:', target_id
 	    return None
 
 	def delete_target(self, target_id):
 	    argv = list()
    	    argv=buildArguments(mode='target', op='delete', tid=target_id)
 	    (status, output) = process_call_argv(argv)
-	    print output
 	    if status != 0:
+	    	print output
 	        return output
+	    print '  delete target successfully, target id:', target_id
 	    return None
 
 	def new_lun(self, target_id, lun_index='1', path=None):
 	    argv = list()
 	    argv = buildArguments(mode='logicalunit', op='new', tid=target_id, lun=lun_index, b=path)
 	    (status, output) = process_call_argv(argv)
-	    print output
 	    if status != 0:
+	    	print output
 	        return output
+	    print '  new lun successfully, target id:', target_id, 'lun index:',lun_index,'path:', path
 	    return None
 
 	def delete_lun(self, target_id, lun_index='1'):
 	    argv = list()
 	    argv = buildArguments(mode='logicalunit', op='delete', tid=target_id, lun=lun_index)
 	    (status, output) = process_call_argv(argv)
-	    print output
 	    if status != 0:
+	    	print output
 	        return output
+	    print '  delete lun successfully, target id:', target_id, 'lun index:',lun_index
 	    return None
 
 

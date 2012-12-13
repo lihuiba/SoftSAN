@@ -22,7 +22,7 @@ def help():
 
 
 def test_lvm():
-	lvm = my_LVM()
+	lvm = LVM2()
 	lvm.load()
 	lvm.print_out()
 	print '<<<<<<<<<<<<   Welcome to lvm controllor  >>>>>>>>>>>>>'
