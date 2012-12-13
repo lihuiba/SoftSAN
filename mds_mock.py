@@ -4,6 +4,7 @@ import guid as Guid
 import random
 import ChkSvr_mock
 
+
 def myNewChunk(arg):
 	ret=msg.NewChunk_Response()
 	ret.size=arg.size
