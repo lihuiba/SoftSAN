@@ -48,7 +48,7 @@ class ChunkServer:
 	def AssembleVolume(self, req):
 		ret = msg.AssembleVolume_Response()
 		a_guid = req.volume.guid
-		if self.chk_dic.get(Guid.toStr(a_guid))==None:
+		if self.chk_dic.get(Guid.toTuple(a_guid))==None:
 			ret.error = ('incorrect guid:'+Guid.toStr(a_guid))
 			return ret
 		target_id = str(a_guid.a%65536)
@@ -96,7 +96,7 @@ class ChunkServer:
 			if output==None:
 				ret.guids.add()
 				Guid.assign(ret.guids[-1], a_guid)
-				self.chk_dic[Guid.toStr(a_guid)]='logical volume'
+				self.chk_dic[Guid.toTuple(a_guid)]='logical volume'
 			else: 
 				ret.error = str(i) + ':' + output + ' '
 				continue
@@ -111,7 +111,7 @@ class ChunkServer:
 			lv_path = '/dev/'+VGNAME+'/'+lv_name
 			output = self.lvm.lv_remove(lv_path)
 			if output==None:
-				del self.chk_dic[Guid.toStr(a_guid)]
+				del self.chk_dic[Guid.toTuple(a_guid)]
 			else:
 				error += Guid.toStr(a_guid)+':'+output+' '
 				ret.error += error
