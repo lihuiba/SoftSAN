@@ -5,6 +5,7 @@ import mds_mock
 import gevent.server
 from pylvm2.lvm_ctrl import *
 from pytgt.tgt_ctrl import *
+from utils import *
 
 CHK_PORT=6789
 CHK_IP='192.168.0.149'
@@ -14,31 +15,10 @@ VGNAME='VolGroup'
 LVNAME='lv_softsan_'
 
 
-def heartBeat():
-	global guid
-	info=msg.ChunkServerInfo()
-	info.ServiceAddress=CHK_IP
-	info.ServicePort=CHK_PORT
-	info.chunks.add()
-	c=info.chunks[0]
-	c.guid.a=0x66
-	c.guid.b=0x77
-	c.guid.c=0x88
-	c.guid.d=0x99
-	c.size=64
-	socket=gevent.socket.socket()
-	socket.connect((MDS_IP, MDS_PORT))
-	stub=rpc.RpcStub(guid, socket, mds_mock.MDS)
-	while True:
-		print 'calling ChunkServerInfo'
-		stub.callMethod('ChunkServerInfo', info)
-		gevent.sleep(3)
-
 class ChunkServer:
 
 	def __init__(self):
 		self.chk_dic = {}
-
 		self.tgt = Tgt()
 		self.lvm = LVM2()
 		self.tgt.reload()
@@ -96,7 +76,7 @@ class ChunkServer:
 			if output==None:
 				ret.guids.add()
 				Guid.assign(ret.guids[-1], a_guid)
-				self.chk_dic[Guid.toTuple(a_guid)]='logical volume'
+				self.chk_dic[Guid.toTuple(a_guid)]=req.size
 			else: 
 				ret.error = str(i) + ':' + output + ' '
 				continue
@@ -118,42 +98,65 @@ class ChunkServer:
 		self.lvm.reload()
 		return ret
 
+# untested function, it did not fill all the attribute of chunkserverInfo
+def heartBeat(server):
+	global guid
+	info=msg.ChunkServerInfo()
+	info.ServiceAddress=CHK_IP
+	info.ServicePort=CHK_PORT
+	for key, value in server.chk_dic:
+		info.chunks.add()
+		chk=info.chunks[-1]
+		chk.guid.a=key[0]
+		chk.guid.b=key[1]
+		chk.guid.c=key[2]
+		chk.guid.d=key[3]
+		chk.size=value
+	socket=gevent.socket.socket()
+	socket.connect((MDS_IP, MDS_PORT))
+	stub=rpc.RpcStub(guid, socket, mds_mock.MDS)
+	while True:
+		print 'calling ChunkServerInfo'
+		stub.callMethod('ChunkServerInfo', info)
+		gevent.sleep(5)
+
 if __name__=='__main__':
 	# guid=msg.Guid()
 	# guid.a=9; guid.b=8; guid.c=7; guid.d=6;
-	# logging.basicConfig(level=logging.DEBUG)
-	# gevent.spawn(heartBeat)
+	logging.basicConfig(level=logging.DEBUG)
+	gevent.spawn(heartBeat)
 	server=ChunkServer()
-	# service=rpc.RpcService(server)
-	# framework=gevent.server.StreamServer(('0.0.0.0', CHK_PORT), service.handler)
-	# framework.serve_forever()
+	service=rpc.RpcService(server)
+	framework=gevent.server.StreamServer(('0.0.0.0', CHK_PORT), service.handler)
+	framework.serve_forever()
 		
 	print '     test begin     '.center(100,'-')
 	print
-	# mock the newchunk request from client
-	req_newchunk=msg.NewChunk_Request()
-	req_newchunk.size=32
-	req_newchunk.count=1
-	ret_newchunk = server.NewChunk(req_newchunk)
+	# # mock the newchunk request from client
+	# req_newchunk=msg.NewChunk_Request()
+	# req_newchunk.size=32
+	# req_newchunk.count=1
+	# ret_newchunk = server.NewChunk(req_newchunk)
 
-	# mock the assemblevolume request from client
-	req_assemblevolume=msg.AssembleVolume_Request()
-	Guid.assign(req_assemblevolume.volume.guid, ret_newchunk.guids[-1])
-	req_assemblevolume.volume.size=32
-	ret_assemblevolume = server.AssembleVolume(req_assemblevolume)
+	# # mock the assemblevolume request from client
+	# req_assemblevolume=msg.AssembleVolume_Request()
+	# Guid.assign(req_assemblevolume.volume.guid, ret_newchunk.guids[-1])
+	# req_assemblevolume.volume.size=32
+	# ret_assemblevolume = server.AssembleVolume(req_assemblevolume)
 
-	# mock req_disassemblevolume
-	req_disassemblevolume = msg.DisassembleVolume_Response()
-	req_disassemblevolume.access_point = ret_assemblevolume.access_point
-	ret_disassemblevolume = server.DisassembleVolume(req_disassemblevolume)
-	print ret_disassemblevolume.access_point
+	# # mock req_disassemblevolume
+	# req_disassemblevolume = msg.DisassembleVolume_Response()
+	# req_disassemblevolume.access_point = ret_assemblevolume.access_point
+	# ret_disassemblevolume = server.DisassembleVolume(req_disassemblevolume)
+	# print ret_disassemblevolume.access_point
 
-	# mock the delchunk request from client
-	req_delchunk = msg.DeleteChunk_Request()
- 	for a_guid in ret_newchunk.guids:
-		t=req_delchunk.guids.add()
-		Guid.assign(t, a_guid)
-	ret_delchunk = server.DeleteChunk(req_delchunk)
+	# # mock the delchunk request from client
+	# req_delchunk = msg.DeleteChunk_Request()
+ # 	for a_guid in ret_newchunk.guids:
+	# 	t=req_delchunk.guids.add()
+	# 	Guid.assign(t, a_guid)
+	# ret_delchunk = server.DeleteChunk(req_delchunk)
+
 
 	print
 	print '     test end     '.center(100,'-')
