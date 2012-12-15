@@ -4,12 +4,17 @@ import mds, ChkSvr_mock
 import gevent.socket
 import guid as Guid
 import block.dm as dm
-import mds.Object as Object
+from mds import Object
 
-nodelist = []
+PORT = 6767
+CHUNKSIZE = 5120
+
+volume_list = []
+guid=msg.Guid()
+guid.a=12; guid.b=13; guid.c=14; guid.d=15;
 
 class Client:
-	def GetChunkServers(guid, MdsIP, SerPort, count = 3):
+	def GetChunkServers(MdsIP, SerPort, count = 5):
 		socket = gevent.socket.socket()
 		socket.connect(MdsIP, SerPort)
 		stub = rpc.RpcStub(guid, socket, mds.MDS)
@@ -18,9 +23,8 @@ class Client:
 		serverlist = stub.callMethod('GetChunkServers', arg)
 		return serverlist
 
-	def NewChunk(guid, serverlist, size, count = 1):
+	def NewChunk(server, size, count = 1):
 		socket = gevent.socket.socket()
-		server = socket.random(serverlist)
 		socker.connect(server.ServiceAddress, server.ServicePort)
 		stub = RpcStub(guid, socket, ChkSvr_mock.ChunkServer)
 		arg = msg.NewChunk_Request()
@@ -29,15 +33,33 @@ class Client:
 		chunklist = stub.callMethod('NewChunk', arg)
 		return chunklist
 
-	def DeleteChunk():
-		pass
+	def NewChunkList(chksizes):
+		serlist = GetChunkServers('192.168.0.12', 2345)
+		chklist = []
+		server = serlist.random[0]
+		chunks = NewChunk(guid, server, size, 2)
+		chunk = Object()
+		chunk.size = chksizes[0]
+		chunk.path = MountChunk(Guid.toStr(chunks.guids[0]), '192.168.0.12')
+		chklist.add(chunk)
+		chunk.path = MountChunk(Guid.toStr(chunks.guids[1]), '192.168.0.12')
+		chklist.add(chunk)
+		# for size in chksizes:
+		# 	server = serlist.random[0]
+		# 	chunks = NewChunk(guid, server, size, 1)
+		# 	chunk = Object()
+		# 	chunk.size = size
+		# 	chunk.path = MountChunk(Guid.toStr(chunks.guids[0]), '192.168.0.12')
+		# 	chklist.add(chunk)
+		return chklist
 
-	def MountChunk(iqn):
-		print 'iqn is :' + iqn
-		nodelist = libiscsi.discover_sendtargets(iqn)
-		nodelist[0].login()
-		print 'nodelist: ---' + nodelist[0].name
-		blkdev = scandev.get_blockdev_by_targetname(nodelist[0].name)
+	def MountChunk(iqn, addr, port = 6789):
+		nodelist = libiscsi.discover_sendtargets(addr, port)
+		for node in nodelist:
+			if iqn is node.name:
+				node.login()
+				blkdev = scandev.get_blockdev_by_targetname(iqn)
+				break
 		return blkdev
 
 	def DismountChunk(iqn):
@@ -47,39 +69,7 @@ class Client:
 				nodelist.remove( node )
 				break
 
-	# def AddLinearDevice(table, start, dev):
-	# 	table += str(start) + ' ' + str(dev.size) + ' linear ' + str(dev.path) + ' 0\n'
-	# 	return table, start+dev.size
-
-	# def AddStripedDevices(table, start, devlist, stripesize = 2048):#1mb
-	# 	num = len(devlist)
-	# 	totsize = 0
-	# 	for dev in devlist:
-	# 		totsize += dev.size
-	# 	table += str(start) + '' + str(totsize) + ' striped ' + str(num) + ' ' + str(stripesize)
-	# 	for dev in devlist:
-	# 		table += ' ' + dev.path + ' 0'
-	# 	table += '\n'
-	# 	return table, start+totsize
-
-	# def CreateMappingTable(devlist, type = 'linear', stripesize = 2048):
-	# 	table = ''
-	# 	start = 0
-	# 	if tpye is 'linear':
-	# 		for dev in devlist:
-	# 			ret = AddLinearDevice(table, start, dev)
-	# 			table = ret[0]
-	# 			start = ret[1]
-	# 	if tpye is 'stripe':
-	# 		AddStripedDevices(table, start, devlist, stripesize)
-	# 	path = os.getcwd() + 'dmtable'
-	# 	fp = open(path, w)
-	# 	fp.write(table)
-	# 	return path
-
-	#def BuildStrategy(size, dmtype, chunklist = None, stripesize = 256):
-
-	def AssembleVolume(volumename = None, strategy):
+	def AssembleVolume(strategy, volumename = ''):
 		tablist = []
 		start = 0
 		for segment in strategy:
@@ -122,19 +112,27 @@ class Client:
 		tblist.append(table)
 		dm.map(volumename, tblist)
 
-	def NewVolume(self, req):#not finished
-		volname = req.name
-		volsize = req.size
-		voltpye = req.type
-		chklist = req.chklist
-		strsize = req.strsize
-		if voltype = None:
+	def NewVolume(self, req):
+		volname = req.volume_name
+		volsize = req.volume_size
+		voltpye = req.volume_type
+		chksizes = req.chunk_size
+		strsize = req.striped_size
+		if voltype is None:
 			voltype = 'linear'
-		if chklist is None:
-			pass
-		if strsize is None:
-			strsize = 256
-		chknum = len(chklist)
+		if chksizes is None:
+			while volsize > CHUNKSIZE:
+				chksizes.append(CHUNKSIZE)
+				volsize -= CHUNKSIZE
+			chksizes.append(volsize)
+
+		chklist = NewChunkList(chksizes)
+		if voltype is 'linear':
+			AssembleLinearVolume(volumename, chklist)
+		else:
+			if strsize is None:
+				strsize = 256
+			AssembleStripedVolume(volumename, chklist)
 
 	def DisassembleVolume(volumename):
 		maplist = dm.maps()
@@ -144,8 +142,6 @@ class Client:
 				break
 
 if __name__=='__main__':
-	guid=msg.Guid()
-	guid.a=12; guid.b=13; guid.c=14; guid.d=15;
 	logging.basicConfig(level=logging.DEBUG)
 
 	server=Client()
