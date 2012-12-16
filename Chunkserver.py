@@ -5,7 +5,7 @@ import mds_mock
 import gevent.server
 from pylvm2.lvm_ctrl import *
 from pytgt.tgt_ctrl import *
-from utils import *
+import util 
 
 CHK_PORT=6789
 CHK_IP='192.168.0.149'
@@ -101,48 +101,48 @@ class ChunkServer:
 # untested function, it did not fill all the attribute of chunkserverInfo
 def heartBeat(server):
 	global guid
-	info=msg.ChunkServerInfo()
-	info.ServiceAddress=CHK_IP
-	info.ServicePort=CHK_PORT
-	for key, value in server.chk_dic:
-		info.chunks.add()
-		chk=info.chunks[-1]
-		chk.guid.a=key[0]
-		chk.guid.b=key[1]
-		chk.guid.c=key[2]
-		chk.guid.d=key[3]
-		chk.size=value
 	socket=gevent.socket.socket()
 	socket.connect((MDS_IP, MDS_PORT))
 	stub=rpc.RpcStub(guid, socket, mds_mock.MDS)
+	(myip, myport)=socket.getsockname()
 	while True:
 		print 'calling ChunkServerInfo'
+		info=msg.ChunkServerInfo()
+		info.ServiceAddress=myip
+		info.ServicePort=myport
+		for key, value in server.chk_dic:
+			info.chunks.add()
+			chk=info.chunks[-1]
+			chk.guid.a=key[0]
+			chk.guid.b=key[1]
+			chk.guid.c=key[2]
+			chk.guid.d=key[3]
+			chk.size=value
 		stub.callMethod('ChunkServerInfo', info)
 		gevent.sleep(5)
 
 if __name__=='__main__':
-	# guid=msg.Guid()
-	# guid.a=9; guid.b=8; guid.c=7; guid.d=6;
-	logging.basicConfig(level=logging.DEBUG)
-	gevent.spawn(heartBeat)
+
 	server=ChunkServer()
-	service=rpc.RpcService(server)
-	framework=gevent.server.StreamServer(('0.0.0.0', CHK_PORT), service.handler)
-	framework.serve_forever()
+	# logging.basicConfig(level=logging.DEBUG)
+	# gevent.spawn(heartBeat)
+	# service=rpc.RpcService(server)
+	# framework=gevent.server.StreamServer(('0.0.0.0', CHK_PORT), service.handler)
+	# framework.serve_forever()
 		
 	print '     test begin     '.center(100,'-')
 	print
-	# # mock the newchunk request from client
-	# req_newchunk=msg.NewChunk_Request()
-	# req_newchunk.size=32
-	# req_newchunk.count=1
-	# ret_newchunk = server.NewChunk(req_newchunk)
+	# mock the newchunk request from client
+	req_newchunk=msg.NewChunk_Request()
+	req_newchunk.size=32
+	req_newchunk.count=1
+	ret_newchunk = server.NewChunk(req_newchunk)
 
-	# # mock the assemblevolume request from client
-	# req_assemblevolume=msg.AssembleVolume_Request()
-	# Guid.assign(req_assemblevolume.volume.guid, ret_newchunk.guids[-1])
-	# req_assemblevolume.volume.size=32
-	# ret_assemblevolume = server.AssembleVolume(req_assemblevolume)
+	# mock the assemblevolume request from client
+	req_assemblevolume=msg.AssembleVolume_Request()
+	Guid.assign(req_assemblevolume.volume.guid, ret_newchunk.guids[-1])
+	req_assemblevolume.volume.size=32
+	ret_assemblevolume = server.AssembleVolume(req_assemblevolume)
 
 	# # mock req_disassemblevolume
 	# req_disassemblevolume = msg.DisassembleVolume_Response()
