@@ -44,4 +44,4 @@ def object2message(object, message):
 
 
 if __name__ == '__main__':
-	print gethostname('www.bing.com')
+	print gethostname('localhost.localdomain')
