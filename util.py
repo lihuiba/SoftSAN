@@ -1,5 +1,5 @@
 import messages_pb2 as msg
-
+import guid as Guid
 
 def gethostname(mdsip):
 	'mdsip: the IP address of MDS'
