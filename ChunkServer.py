@@ -18,7 +18,6 @@ LVNAME='lv_softsan_'
 class ChunkServer:
 
 	def __init__(self):
-		self.chk_dic = {}
 		self.tgt = Tgt()
 		self.lvm = LVM2()
 		self.tgt.reload()
@@ -28,23 +27,14 @@ class ChunkServer:
 	def AssembleVolume(self, req):
 		ret = msg.AssembleVolume_Response()
 		a_guid = req.volume.guid
-		if self.chk_dic.get(Guid.toTuple(a_guid))==None:
-			ret.error = ('incorrect guid:'+Guid.toStr(a_guid))
-			return ret
 		target_id = str(a_guid.a%65536)
 		target_name = "iqn:softsan_"+Guid.toStr(a_guid)
 		acl = 'ALL'
 		lun_index = '1'
 		lv_name = LVNAME+Guid.toStr(a_guid)
 		lun_path = '/dev/'+VGNAME+'/'+lv_name
-		if self.tgt.new_target(target_id, target_name)!=None:
-			ret.error = 'failed to new target'
-			return ret
-		if self.tgt.bind_target(target_id, acl)!=None:
-			ret.error = 'failed to bind target'
-			return ret
-		if self.tgt.new_lun(target_id, lun_index, lun_path)!=None:
-			ret.error = 'failed to new lun'
+		if self.tgt.assemble(target_id, target_name, lun_path, acl)!=None:
+			ret.error = 'Failed to assemble volume'
 			return ret
 		self.tgt.reload()			
 		ret.access_point = target_name
@@ -68,18 +58,15 @@ class ChunkServer:
 	def NewChunk(self, req):
 		ret = msg.NewChunk_Response()
 		size = str(req.size)+'M'
-		print 'NewChunk is being called'
 		for i in range(req.count):
 			a_guid = Guid.generate()
 			lv_name = LVNAME+Guid.toStr(a_guid)
 			lv_size = size
 			output =  self.lvm.lv_create(VGNAME, lv_name, lv_size)
-
 			if output == None:
 				t=ret.guids.add()
 				Guid.assign(t, a_guid)
 				key=Guid.toTuple(a_guid)
-				self.chk_dic[key]=req.size
 			else: 
 				ret.error = str(i) + ':' + output + ' '
 				continue
@@ -93,9 +80,7 @@ class ChunkServer:
 			lv_name = LVNAME+Guid.toStr(a_guid)
 			lv_path = '/dev/'+VGNAME+'/'+lv_name
 			output = self.lvm.lv_remove(lv_path)
-			if output==None:
-				del self.chk_dic[Guid.toTuple(a_guid)]
-			else:
+			if output!=None:
 				error += Guid.toStr(a_guid)+':'+output+' '
 				ret.error += error
 		self.lvm.reload()
@@ -114,19 +99,16 @@ def heartBeat(server):
 		info=msg.ChunkServerInfo()
 		info.ServiceAddress=CHK_IP
 		info.ServicePort=CHK_PORT
-		print info.ServiceAddress, ':', info.ServicePort
-		
-		for k in server.chk_dic:
+		server.lvm.read_lvs()
+		for lv in server.lvm.softsan_lvs:
 			info.chunks.add()
 			chk=info.chunks[-1]
-			chk.guid.a=k[0]
-			chk.guid.b=k[1]
-			chk.guid.c=k[2]
-			chk.guid.d=k[3]
-			chk.size = server.chk_dic[k]  
-			
+			name4guid = lv.name.split('lv_softsan_')[1]
+			Guid.assign(chk.guid, Guid.fromStr(name4guid))
+			chk.size = int(filter(lambda ch: ch in '0123456789.', lv.total).split('.')[0])
+			print 'name4guid:', name4guid, 'chk.size:',chk.size
 		stub.callMethod('ChunkServerInfo', info)
-		gevent.sleep(3)
+		gevent.sleep(2)
 
 
 if __name__=='__main__':

@@ -151,11 +151,9 @@ class LVM:
 	def __reload_lvs(self):
 		self.lvs = list()
 		self.lvs_paths = {}
-		# lv paths query command
 		argv = list()
 		argv.append(LVDISPLAY_BIN_PATH)
 		argv.append("-c")
-		# execute command
 		(status, output) = process_call_argv(argv)
 		if status != 0:
 			print "error getting list of LV paths"

@@ -3,6 +3,10 @@ from pylvm.lvm import *
 
 class LVM2(LVM):
 
+	def __init__(self):
+		self.softsan_lvs = []
+		self.read_lvs()
+
 	#***********************   vg operator  *************************
 	def vg_create_active(self, vgname, pvset):
 		argv = list()
@@ -160,6 +164,14 @@ class LVM2(LVM):
 			return "error removING LV"
 		return None
 
+	def read_lvs(self, vgname_softsan=None):
+		self.reload()
+		self.softsan_lvs=[]
+		for vg in self.vgs:
+			for lv in vg.lvs:
+				if lv.name.find('lv_softsan_')==0:
+					self.softsan_lvs.append(lv)
+		return None
 
 
 

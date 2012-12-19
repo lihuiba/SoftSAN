@@ -106,7 +106,7 @@ class Tgt:
 	    if status != 0:
 	    	print output
 	        return output
-	    print '  new target successfully, target id:',target_id
+	    print '  New target successfully, target id:',target_id
 	    return None
 
 	def bind_target(self, target_id, acl='ALL'):
@@ -116,7 +116,7 @@ class Tgt:
 	    if status != 0:
 	    	print output
 	        return output
-	    print '  bind target successfully, target id:', target_id
+	    print '  Bind target successfully, target id:', target_id
 	    return None
 
 	def unbind_target(self, target_id, acl='ALL'):
@@ -126,7 +126,7 @@ class Tgt:
 	    if status != 0:
 	        return output
        	    print output
-	    print '  bind target successfully, target id:', target_id
+	    print '  Bind target successfully, target id:', target_id
 	    return None
 
 	def delete_target(self, target_id):
@@ -136,17 +136,17 @@ class Tgt:
 	    if status != 0:
 	    	print output
 	        return output
-	    print '  delete target successfully, target id:', target_id
+	    print '  Delete target successfully, target id:', target_id
 	    return None
 
-	def new_lun(self, target_id, lun_index='1', path=None):
+	def new_lun(self, target_id, path, lun_index='1'):
 	    argv = list()
 	    argv = buildArguments(mode='logicalunit', op='new', tid=target_id, lun=lun_index, b=path)
 	    (status, output) = process_call_argv(argv)
 	    if status != 0:
 	    	print output
 	        return output
-	    print '  new lun successfully, target id:', target_id, 'lun index:',lun_index,'path:', path
+	    print '  New lun successfully, target id:', target_id, 'lun index:',lun_index,'path:', path
 	    return None
 
 	def delete_lun(self, target_id, lun_index='1'):
@@ -156,9 +156,36 @@ class Tgt:
 	    if status != 0:
 	    	print output
 	        return output
-	    print '  delete lun successfully, target id:', target_id, 'lun index:',lun_index
+	    print '  Delete lun successfully, target id:', target_id, 'lun index:',lun_index
 	    return None
 
+	def assemble(self, target_id, target_name, lun_path, acl='ALL'):
+		output = self.new_target(target_id, target_name) 
+		if output != None:
+			print 'Assemble failure:', output
+			return output
+		output = self.bind_target(target_id, acl)
+		if output != None:
+			self.delete_target(target_id)
+			print 'Assemble failure:', output
+			return output
+		output = self.new_lun(target_id, lun_path)
+		if output != None:
+			self.delete_target(target_id)
+			print 'Assemble failure:', output
+			return output
+		print 'Assemble successfully, target_id:', target_id, 'path:', lun_path
+		return None
+
+	def disassemble(self, target_id):
+	    argv = list()
+   	    argv=buildArguments(mode='target', op='delete', tid=target_id)
+	    (status, output) = process_call_argv(argv)
+	    if status != 0:
+	    	print output
+	        return output
+	    print '  Disassemble target successfully, target id:', target_id
+	    return None
 
 
 if __name__=="__main__":

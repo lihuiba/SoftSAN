@@ -51,7 +51,6 @@ class MDS:
 			t=ret.random.add()
 			t.ServiceAddress=s.ServiceAddress
 			t.ServicePort=int(s.ServicePort)
-			print s.__dict__
 		return ret
 
 	def __ForwardNewChunk__(self, arg, target, aresponse):
