@@ -1,8 +1,8 @@
 import rpc, logging
 import messages_pb2 as msg
-import ChkSvr_mock, Chunkserver
+import ChunkServer
 import gevent.socket
-import mds, mds_old
+import mds
 
 MDS_IP='192.168.0.149'
 MDS_PORT=2345
@@ -29,7 +29,7 @@ guid.d=40
 # socket.close()
 s2=gevent.socket.socket()
 s2.connect((CHK_IP, CHK_PORT))
-stub2=rpc.RpcStub(guid, s2, Chunkserver.ChunkServer)
+stub2=rpc.RpcStub(guid, s2, ChunkServer.ChunkServer)
 arg2=msg.NewChunk_Request()
 arg2.size=32
 arg2.count=1

@@ -4,7 +4,7 @@ import guid as Guid
 import transientdb
 import persistentdb
 import gevent.socket
-import ChkSvr_mock as chunkserver
+import ChunkServer
 from util import *
 import rpc
 
@@ -34,9 +34,10 @@ class MDS:
 		self.pdb=persistentdb
 		socket=gevent.socket.socket()
 		guid=Guid.generate()
-		self.stub=rpc.RpcStub(guid, socket, chunkserver.ChunkServer)
+		self.stub=rpc.RpcStub(guid, socket, ChunkServer.ChunkServer)
 
 	def ChunkServerInfo(self, arg):
+		print arg
 		cksinfo=message2object(arg)
 		cksinfo.guid=Guid.toStr(self.service.peerGuid())
 		self.tdb.putChunkServer(cksinfo)

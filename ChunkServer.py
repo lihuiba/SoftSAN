@@ -1,7 +1,7 @@
 import rpc, logging
 import messages_pb2 as msg
 import guid as Guid
-import mds_old
+import mds
 import gevent.server
 from pylvm2.lvm_ctrl import *
 from pytgt.tgt_ctrl import *
@@ -106,7 +106,7 @@ def heartBeat(server):
 	global guid
 	socket=gevent.socket.socket()
 	socket.connect((MDS_IP, MDS_PORT))
-	stub=rpc.RpcStub(guid, socket, mds_old.MDS)
+	stub=rpc.RpcStub(guid, socket, mds.MDS)
 	(myip, myport)=socket.getsockname()
 	print myip, ':', myport
 	while True:

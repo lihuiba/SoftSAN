@@ -1,3 +1,6 @@
+import messages_pb2 as msg
+
+
 def gethostname(mdsip):
 	'mdsip: the IP address of MDS'
 	import socket

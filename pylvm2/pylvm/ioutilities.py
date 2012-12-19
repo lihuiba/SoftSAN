@@ -13,14 +13,17 @@ def process_call2(command, argv):
 		
 def process_call_argv(argv):
 	if argv:
-		process = subprocess.Popen(argv, stdout=subprocess.PIPE)
+		process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	else:
-		process = subprocess.Popen(argv, stdout=subprocess.PIPE)
+		process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	
 	output = ""
 	while True:
 		out = process.stdout.readline()
 		if out == '' and process.poll() != None: break
 		output += out
-		
+
+	process.stdout.close()
+	#process.stdin.close()
+	#process.stderr.close()		
 	return (process.returncode, output)	

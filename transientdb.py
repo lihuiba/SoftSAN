@@ -44,11 +44,12 @@ class TransientDB:
             self.putLoad(cksguid, cksinfo.load)
             del cksinfo.load
         if hasattr(cksinfo, 'disks'):
-            del cksinfo.disks            
-        chunks=cksinfo.chunks
-        cksinfo.chunks=[x.guid for x in chunks]
+            del cksinfo.disks
+        if hasattr(cksinfo, 'chunks'):
+            chunks=cksinfo.chunks
+            cksinfo.chunks=[x.guid for x in chunks]
+            self.putChunks(cksguid, chunks)
         self.putObjects('ChunkServer.', cksinfo)
-        self.putChunks(cksguid, chunks)
     def putChunks(self, serverid, chunks):
         chunks,_=container(chunks)
         for c in chunks:
