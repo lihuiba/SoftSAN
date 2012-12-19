@@ -6,6 +6,7 @@ import gevent.server
 from pylvm2.lvm_ctrl import *
 from pytgt.tgt_ctrl import *
 import util 
+import random
 
 MDS_IP='192.168.0.149'
 MDS_PORT=2345
@@ -27,7 +28,10 @@ class ChunkServer:
 	def AssembleVolume(self, req):
 		ret = msg.AssembleVolume_Response()
 		a_guid = req.volume.guid
-		target_id = str(a_guid.a%65536)
+		target_id = str(random.randint(0,1024*1024))
+		
+		while self.tgt.is_in_targetlist(target_id):
+			target_id = str(random.randint(0,1024*1024))
 		target_name = "iqn:softsan_"+Guid.toStr(a_guid)
 		acl = 'ALL'
 		lun_index = '1'
@@ -43,10 +47,13 @@ class ChunkServer:
 # why DisassembleVolume_Response return the value of access_point? keep consistent with request
 	def DisassembleVolume(self, req):
 		ret = msg.DisassembleVolume_Response()
+		print 'in DisassembleVolume()', req.access_point
 		ret.access_point = req.access_point
 		self.tgt.reload()
 		target_name = req.access_point
+		# print 'target_name', target_name 
 		target_id = self.tgt.target_name2target_id(target_name)
+		# print 'target_id:',target_id
 		if target_id==None:
 			ret.error='No such access_point'
 			return ret
@@ -93,9 +100,8 @@ def heartBeat(server):
 	socket.connect((MDS_IP, MDS_PORT))
 	stub=rpc.RpcStub(guid, socket, mds.MDS)
 	(myip, myport)=socket.getsockname()
-	print myip, ':', myport
 	while True:
-		print 'calling ChunkServerInfo'
+		# print 'calling ChunkServerInfo'
 		info=msg.ChunkServerInfo()
 		info.ServiceAddress=CHK_IP
 		info.ServicePort=CHK_PORT
@@ -106,7 +112,6 @@ def heartBeat(server):
 			name4guid = lv.name.split('lv_softsan_')[1]
 			Guid.assign(chk.guid, Guid.fromStr(name4guid))
 			chk.size = int(filter(lambda ch: ch in '0123456789.', lv.total).split('.')[0])
-			print 'name4guid:', name4guid, 'chk.size:',chk.size
 		stub.callMethod('ChunkServerInfo', info)
 		gevent.sleep(2)
 

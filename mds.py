@@ -37,11 +37,11 @@ class MDS:
 		self.stub=rpc.RpcStub(guid, socket, ChunkServer.ChunkServer)
 
 	def ChunkServerInfo(self, arg):
-		print arg
+		# print arg
 		cksinfo=message2object(arg)
 		cksinfo.guid=Guid.toStr(self.service.peerGuid())
 		self.tdb.putChunkServer(cksinfo)
-		print cksinfo.__dict__
+		# print cksinfo.__dict__
 
 	def GetChunkServers(self, arg):
 		ret=msg.GetChunkServers_Response()

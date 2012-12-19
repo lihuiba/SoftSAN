@@ -84,6 +84,13 @@ class Tgt:
 	    if status != 0:
 	        print "error occur reload target"
 	    return output
+
+	def is_in_targetlist(self, target_id):
+		self.reload()
+		for target in self.targetlist:
+			if target_id==target.id:
+				return True
+		return False
 			        
 	def print_out(self):
 	    for target in self.targetlist:
