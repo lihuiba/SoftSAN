@@ -75,9 +75,10 @@ class RpcService:
 			ret=method(argument)
 			assert type(ret)==rettype
 		except:
-			ret=rettype()
-			if hasattr(ret, 'error'):
-				ret.error=sys.exc_info()[0]
+			if rettype!=type(None):
+				ret=rettype()
+				if hasattr(ret, 'error'):
+					ret.error=sys.exc_info()[0]
 			logging.error("exception ", exc_info=1)
 		return ret
 	
@@ -96,6 +97,7 @@ class RpcService:
 			name='Exception'
 			exctype,value = sys.exc_info()[:2]
 			body="{0}\n{1}".format(value.__class__.__name__, value)
+			logging.error("exception ", exc_info=1)
 		sendRpc(socket, guid, token, name, body)		
 	
 	def handler(self, socket, address):

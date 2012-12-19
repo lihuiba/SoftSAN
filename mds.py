@@ -33,6 +33,7 @@ class MDS:
 		self.tdb=transientdb
 		self.pdb=persistentdb
 		socket=gevent.socket.socket()
+		guid=Guid.generate()
 		self.stub=rpc.RpcStub(guid, socket, chunkserver.ChunkServer)
 
 	def ChunkServerInfo(self, arg):

@@ -76,10 +76,10 @@ class ChunkServer:
 			output =  self.lvm.lv_create(VGNAME, lv_name, lv_size)
 
 			if output == None:
-				ret.guids.add()
-				Guid.assign(ret.guids[-1], a_guid)
-				self.chk_dic[Guid.toTuple(a_guid)]=req.size
-				print '---------------------', self.chk_dic[-1]
+				t=ret.guids.add()
+				Guid.assign(t, a_guid)
+				key=Guid.toTuple(a_guid)
+				self.chk_dic[key]=req.size
 			else: 
 				ret.error = str(i) + ':' + output + ' '
 				continue
