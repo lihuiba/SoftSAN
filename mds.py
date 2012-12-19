@@ -6,6 +6,7 @@ import persistentdb
 import gevent.socket
 import ChkSvr_mock as chunkserver
 from util import *
+import rpc
 
 def splitbyattr(objs, key):
 	objs.sort(key = lambda x : getattr(x, key))

@@ -4,6 +4,10 @@ import guid as Guid
 import rpc, transientdb
 import gevent.server
 
+MDS_IP='192.168.0.149'
+MDS_PORT=2345
+CHK_IP='192.168.0.149'
+CHK_PORT=6789
 
 class Object:
     def __init__(self, d=None):
@@ -54,22 +58,30 @@ class MDS:
     def __init__(self, transientdb):
         self.service=None
         self.tdb=transientdb
+
     def ChunkServerInfo(self, arg):
         logging.debug(type(arg))
         cksinfo=message2object(arg)
         cksinfo.guid=Guid.toStr(self.service.peerGuid())
         self.tdb.putChunkServer(cksinfo)
-        print cksinfo.__dict__
+        print '-------------ChunkServer call me-----------------'
+        
+        # print cksinfo.__dict__
+        # print cksinfo.guid
+
+       
     def GetChunkServers(self, arg):
         ret=msg.GetChunkServers_Response()
         servers=self.tdb.getChunkServerList()
         servers=self.tdb.getChunkServers(servers)
+        print 'servers:', servers
         for s in servers:
-            print s.__dict__
+            # print s.__dict__
             ret.random.add()
             t=ret.random[-1]
             t.ServiceAddress=s.ServiceAddress
             t.ServicePort=int(s.ServicePort)
+            
         return ret
     # def NewChunk(self, arg):
     #     logging.debug(type(arg))
@@ -142,7 +154,7 @@ def test_main():
     tdb=transientdb.TransientDB()
     server=MDS(tdb)
     service=rpc.RpcService(server)
-    framework=gevent.server.StreamServer(('0.0.0.0', 2345), service.handler)
+    framework=gevent.server.StreamServer(('0.0.0.0', MDS_PORT), service.handler)
     framework.serve_forever()
 
 

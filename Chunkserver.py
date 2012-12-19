@@ -1,16 +1,16 @@
 import rpc, logging
 import messages_pb2 as msg
 import guid as Guid
-import mds_mock
+import mds_old
 import gevent.server
 from pylvm2.lvm_ctrl import *
 from pytgt.tgt_ctrl import *
 import util 
 
-CHK_PORT=6789
-CHK_IP='192.168.0.149'
 MDS_IP='192.168.0.149'
 MDS_PORT=2345
+CHK_IP='192.168.0.149'
+CHK_PORT=6789
 VGNAME='VolGroup'
 LVNAME='lv_softsan_'
 
@@ -68,17 +68,22 @@ class ChunkServer:
 	def NewChunk(self, req):
 		ret = msg.NewChunk_Response()
 		size = str(req.size)+'M'
+		print 'NewChunk is being called'
 		for i in range(req.count):
 			a_guid = Guid.generate()
 			lv_name = LVNAME+Guid.toStr(a_guid)
 			lv_size = size
 			output =  self.lvm.lv_create(VGNAME, lv_name, lv_size)
-			if output==None:
+
+			if output == None:
 				ret.guids.add()
 				Guid.assign(ret.guids[-1], a_guid)
 				self.chk_dic[Guid.toTuple(a_guid)]=req.size
+				# print ret.guids[-1]
+				# print '-------------------------------------create a logical volume!'
 			else: 
 				ret.error = str(i) + ':' + output + ' '
+				# print '-------------------------------------error create lv'
 				continue
 		self.lvm.reload()
 		return ret
@@ -103,13 +108,15 @@ def heartBeat(server):
 	global guid
 	socket=gevent.socket.socket()
 	socket.connect((MDS_IP, MDS_PORT))
-	stub=rpc.RpcStub(guid, socket, mds_mock.MDS)
+	stub=rpc.RpcStub(guid, socket, mds_old.MDS)
 	(myip, myport)=socket.getsockname()
+	print myip, ':', myport
 	while True:
 		print 'calling ChunkServerInfo'
 		info=msg.ChunkServerInfo()
-		info.ServiceAddress=myip
-		info.ServicePort=myport
+		info.ServiceAddress=CHK_IP
+		info.ServicePort=CHK_PORT
+		print info.ServiceAddress, ':', info.ServicePort
 		for key, value in server.chk_dic:
 			info.chunks.add()
 			chk=info.chunks[-1]
@@ -118,46 +125,77 @@ def heartBeat(server):
 			chk.guid.c=key[2]
 			chk.guid.d=key[3]
 			chk.size=value
+			print '<><><><><><><><><><><><><>', chk.guid.a
 		stub.callMethod('ChunkServerInfo', info)
-		gevent.sleep(5)
+		gevent.sleep(3)
+
+# def heartBeat():
+# 	global guid
+# 	info=msg.ChunkServerInfo()
+# 	info.ServiceAddress=CHK_IP
+# 	info.ServicePort=CHK_PORT
+# 	info.chunks.add()
+# 	c=info.chunks[0]
+# 	c.guid.a=0x66
+# 	c.guid.b=0x77
+# 	c.guid.c=0x88
+# 	c.guid.d=0x99
+# 	c.size=64
+# 	socket=gevent.socket.socket()
+# 	socket.connect((MDS_IP, MDS_PORT))
+# 	stub=rpc.RpcStub(guid, socket, mds_old.MDS)
+# 	while True:
+# 		print 'calling ChunkServerInfo'
+# 		stub.callMethod('ChunkServerInfo', info)
+# 		gevent.sleep(3)
 
 if __name__=='__main__':
 
-	server=ChunkServer()
-	# logging.basicConfig(level=logging.DEBUG)
-	# gevent.spawn(heartBeat)
-	# service=rpc.RpcService(server)
-	# framework=gevent.server.StreamServer(('0.0.0.0', CHK_PORT), service.handler)
-	# framework.serve_forever()
+	# server=ChunkServer()
+	# # logging.basicConfig(level=logging.DEBUG)
+	# # gevent.spawn(heartBeat)
+	# # service=rpc.RpcService(server)
+	# # framework=gevent.server.StreamServer(('0.0.0.0', CHK_PORT), service.handler)
+	# # framework.serve_forever()
 		
-	print '     test begin     '.center(100,'-')
-	print
-	# mock the newchunk request from client
-	req_newchunk=msg.NewChunk_Request()
-	req_newchunk.size=32
-	req_newchunk.count=1
-	ret_newchunk = server.NewChunk(req_newchunk)
+	# print '     test begin     '.center(100,'-')
+	# print
+	# # mock the newchunk request from client
+	# req_newchunk=msg.NewChunk_Request()
+	# req_newchunk.size=32
+	# req_newchunk.count=1
+	# ret_newchunk = server.NewChunk(req_newchunk)
 
-	# mock the assemblevolume request from client
-	req_assemblevolume=msg.AssembleVolume_Request()
-	Guid.assign(req_assemblevolume.volume.guid, ret_newchunk.guids[-1])
-	req_assemblevolume.volume.size=32
-	ret_assemblevolume = server.AssembleVolume(req_assemblevolume)
+	# # mock the assemblevolume request from client
+	# req_assemblevolume=msg.AssembleVolume_Request()
+	# Guid.assign(req_assemblevolume.volume.guid, ret_newchunk.guids[-1])
+	# req_assemblevolume.volume.size=32
+	# ret_assemblevolume = server.AssembleVolume(req_assemblevolume)
 
-	# # mock req_disassemblevolume
-	# req_disassemblevolume = msg.DisassembleVolume_Response()
-	# req_disassemblevolume.access_point = ret_assemblevolume.access_point
-	# ret_disassemblevolume = server.DisassembleVolume(req_disassemblevolume)
-	# print ret_disassemblevolume.access_point
+	# # # mock req_disassemblevolume
+	# # req_disassemblevolume = msg.DisassembleVolume_Response()
+	# # req_disassemblevolume.access_point = ret_assemblevolume.access_point
+	# # ret_disassemblevolume = server.DisassembleVolume(req_disassemblevolume)
+	# # print ret_disassemblevolume.access_point
 
-	# # mock the delchunk request from client
-	# req_delchunk = msg.DeleteChunk_Request()
- # 	for a_guid in ret_newchunk.guids:
-	# 	t=req_delchunk.guids.add()
-	# 	Guid.assign(t, a_guid)
-	# ret_delchunk = server.DeleteChunk(req_delchunk)
+	# # # mock the delchunk request from client
+	# # req_delchunk = msg.DeleteChunk_Request()
+ # # 	for a_guid in ret_newchunk.guids:
+	# # 	t=req_delchunk.guids.add()
+	# # 	Guid.assign(t, a_guid)
+	# # ret_delchunk = server.DeleteChunk(req_delchunk)
 
 
-	print
-	print '     test end     '.center(100,'-')
+	# print
+	# print '     test end     '.center(100,'-')
+	server=ChunkServer()
+	guid=msg.Guid()
+	guid.a=1; guid.b=8; guid.c=2; guid.d=1
+	logging.basicConfig(level=logging.DEBUG)	
+	gevent.spawn(heartBeat(server))
+
+	
+	service=rpc.RpcService(server)
+	framework=gevent.server.StreamServer(('0.0.0.0',CHK_PORT), service.handler)
+	framework.serve_forever()
 	
