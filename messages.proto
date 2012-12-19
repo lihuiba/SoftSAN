@@ -77,7 +77,7 @@ message Volume {
     optional string assembler=2;            //assembled by an assembler,
     repeated string parameters=3;           //with parameters
     repeated Volume subvolumes=4;           //and a list of sub-volumes
-    required Guid guid=5;                   //A volume can have a name (guid), or reference a chunk
+    optional Guid guid=5;                   //A volume can have a name (guid), or reference a chunk
 }
 
 message ReadVolume_Request {                //P2S message
