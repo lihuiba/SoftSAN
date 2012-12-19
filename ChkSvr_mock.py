@@ -46,7 +46,7 @@ if __name__=='__main__':
 	guid.a=9; guid.b=8; guid.c=7; guid.d=6;
 	logging.basicConfig(level=logging.DEBUG)
 
-	# gevent.spawn(heartBeat)
+	gevent.spawn(heartBeat)
 
 	server=ChunkServer()
 	service=rpc.RpcService(server)

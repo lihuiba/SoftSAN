@@ -79,11 +79,9 @@ class ChunkServer:
 				ret.guids.add()
 				Guid.assign(ret.guids[-1], a_guid)
 				self.chk_dic[Guid.toTuple(a_guid)]=req.size
-				# print ret.guids[-1]
-				# print '-------------------------------------create a logical volume!'
+				print '---------------------', self.chk_dic[-1]
 			else: 
 				ret.error = str(i) + ':' + output + ' '
-				# print '-------------------------------------error create lv'
 				continue
 		self.lvm.reload()
 		return ret
@@ -117,37 +115,19 @@ def heartBeat(server):
 		info.ServiceAddress=CHK_IP
 		info.ServicePort=CHK_PORT
 		print info.ServiceAddress, ':', info.ServicePort
-		for key, value in server.chk_dic:
+		
+		for k in server.chk_dic:
 			info.chunks.add()
 			chk=info.chunks[-1]
-			chk.guid.a=key[0]
-			chk.guid.b=key[1]
-			chk.guid.c=key[2]
-			chk.guid.d=key[3]
-			chk.size=value
-			print '<><><><><><><><><><><><><>', chk.guid.a
+			chk.guid.a=k[0]
+			chk.guid.b=k[1]
+			chk.guid.c=k[2]
+			chk.guid.d=k[3]
+			chk.size = server.chk_dic[k]  
+			
 		stub.callMethod('ChunkServerInfo', info)
 		gevent.sleep(3)
 
-# def heartBeat():
-# 	global guid
-# 	info=msg.ChunkServerInfo()
-# 	info.ServiceAddress=CHK_IP
-# 	info.ServicePort=CHK_PORT
-# 	info.chunks.add()
-# 	c=info.chunks[0]
-# 	c.guid.a=0x66
-# 	c.guid.b=0x77
-# 	c.guid.c=0x88
-# 	c.guid.d=0x99
-# 	c.size=64
-# 	socket=gevent.socket.socket()
-# 	socket.connect((MDS_IP, MDS_PORT))
-# 	stub=rpc.RpcStub(guid, socket, mds_old.MDS)
-# 	while True:
-# 		print 'calling ChunkServerInfo'
-# 		stub.callMethod('ChunkServerInfo', info)
-# 		gevent.sleep(3)
 
 if __name__=='__main__':
 
@@ -192,9 +172,7 @@ if __name__=='__main__':
 	guid=msg.Guid()
 	guid.a=1; guid.b=8; guid.c=2; guid.d=1
 	logging.basicConfig(level=logging.DEBUG)	
-	gevent.spawn(heartBeat(server))
-
-	
+	gevent.spawn(heartBeat, server)
 	service=rpc.RpcService(server)
 	framework=gevent.server.StreamServer(('0.0.0.0',CHK_PORT), service.handler)
 	framework.serve_forever()

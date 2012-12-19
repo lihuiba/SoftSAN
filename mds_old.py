@@ -63,8 +63,9 @@ class MDS:
         logging.debug(type(arg))
         cksinfo=message2object(arg)
         cksinfo.guid=Guid.toStr(self.service.peerGuid())
+        print '-------------   before  self.tdb.putChunkServer(cksinfo)   -----------------'
         self.tdb.putChunkServer(cksinfo)
-        print '-------------ChunkServer call me-----------------'
+        print '-------------   after  self.tdb.putChunkServer(cksinfo)   -----------------'
         
         # print cksinfo.__dict__
         # print cksinfo.guid
@@ -74,7 +75,7 @@ class MDS:
         ret=msg.GetChunkServers_Response()
         servers=self.tdb.getChunkServerList()
         servers=self.tdb.getChunkServers(servers)
-        print 'servers:', servers
+        print '---------------------'
         for s in servers:
             # print s.__dict__
             ret.random.add()
