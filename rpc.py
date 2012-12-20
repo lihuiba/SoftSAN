@@ -75,11 +75,11 @@ class RpcService:
 			ret=method(argument)
 			assert type(ret)==rettype
 		except:
+			logging.error("exception ", exc_info=1)
 			if rettype!=type(None):
 				ret=rettype()
 				if hasattr(ret, 'error'):
-					ret.error=sys.exc_info()[0]
-			logging.error("exception ", exc_info=1)
+					ret.error=str(sys.exc_info()[1])
 		return ret
 	
 	def doService(self, socket):

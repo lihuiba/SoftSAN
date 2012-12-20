@@ -28,8 +28,7 @@ class ChunkServer:
 	def AssembleVolume(self, req):
 		ret = msg.AssembleVolume_Response()
 		a_guid = req.volume.guid
-		target_id = str(random.randint(0,1024*1024))
-		
+		target_id = 1		
 		while self.tgt.is_in_targetlist(target_id):
 			target_id = str(random.randint(0,1024*1024))
 		target_name = "iqn:softsan_"+Guid.toStr(a_guid)
@@ -48,7 +47,6 @@ class ChunkServer:
 	def DisassembleVolume(self, req):
 		ret = msg.DisassembleVolume_Response()
 		print 'in DisassembleVolume()', req.access_point
-		ret.access_point = req.access_point
 		self.tgt.reload()
 		target_name = req.access_point
 		# print 'target_name', target_name 
