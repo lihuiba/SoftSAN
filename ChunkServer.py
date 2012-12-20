@@ -15,7 +15,6 @@ CHK_PORT=6789
 VGNAME='VolGroup'
 LVNAME='lv_softsan_'
 
-
 class ChunkServer:
 
 	def __init__(self):
@@ -24,34 +23,34 @@ class ChunkServer:
 		self.tgt.reload()
 		self.lvm.reload()
 	
-# chkserv always uses lun_index=1. if the requested volume does notchkserv 
+#  always use lun_index=1. 
 	def AssembleVolume(self, req):
+		self.tgt.reload()
 		ret = msg.AssembleVolume_Response()
 		a_guid = req.volume.guid
-		target_id = 1		
-		while self.tgt.is_in_targetlist(target_id):
+		while True:
 			target_id = str(random.randint(0,1024*1024))
+			if not self.tgt.is_in_targetlist(target_id): 
+				break			
 		target_name = "iqn:softsan_"+Guid.toStr(a_guid)
-		acl = 'ALL'
-		lun_index = '1'
-		lv_name = LVNAME+Guid.toStr(a_guid)
-		lun_path = '/dev/'+VGNAME+'/'+lv_name
-		if self.tgt.assemble(target_id, target_name, lun_path, acl)!=None:
-			ret.error = 'Failed to assemble volume'
-			return ret
-		self.tgt.reload()			
-		ret.access_point = target_name
+		find_target = self.tgt.target_name2target_id(target_name)
+		if find_target != None:
+			ret.access_point = target_name
+		else:
+			lv_name = LVNAME+Guid.toStr(a_guid)
+			lun_path = '/dev/'+VGNAME+'/'+lv_name
+			if self.tgt.assemble(target_id, target_name, lun_path, 'ALL')!=None:
+				ret.error = 'Failed to assemble volume'
+				return ret
+			ret.access_point = target_name
 		return ret
 		
-# why DisassembleVolume_Response return the value of access_point? keep consistent with request
 	def DisassembleVolume(self, req):
-		ret = msg.DisassembleVolume_Response()
-		print 'in DisassembleVolume()', req.access_point
 		self.tgt.reload()
+		ret = msg.DisassembleVolume_Response()
+		logging.debug('in DisassembleVolume()', req.access_point)
 		target_name = req.access_point
-		# print 'target_name', target_name 
 		target_id = self.tgt.target_name2target_id(target_name)
-		# print 'target_id:',target_id
 		if target_id==None:
 			ret.error='No such access_point'
 			return ret
@@ -61,6 +60,7 @@ class ChunkServer:
 
 # try to create every requested chunk.however, if some chunk can not be created, fill the ret.error with the output of lvcreate 
 	def NewChunk(self, req):
+		self.lvm.reload()
 		ret = msg.NewChunk_Response()
 		size = str(req.size)+'M'
 		for i in range(req.count):
@@ -74,24 +74,21 @@ class ChunkServer:
 				key=Guid.toTuple(a_guid)
 			else: 
 				ret.error = str(i) + ':' + output + ' '
-				continue
-		self.lvm.reload()
 		return ret
 
 # try to delete every requested chunk. if it can not delete, fill the ret.error with output of lvremove
 	def DeleteChunk(self, req):
+		self.lvm.reload()
 		ret = msg.DeleteChunk_Response()
 		for a_guid in req.guids:
 			lv_name = LVNAME+Guid.toStr(a_guid)
 			lv_path = '/dev/'+VGNAME+'/'+lv_name
 			output = self.lvm.lv_remove(lv_path)
 			if output!=None:
-				error += Guid.toStr(a_guid)+':'+output+' '
+				error += Guid.toStr(a_guid) + ':'+ output+ ' '
 				ret.error += error
-		self.lvm.reload()
 		return ret
 
-# untested function, it did not fill all the attribute of chunkserverInfo
 def heartBeat(server):
 	global guid
 	socket=gevent.socket.socket()
@@ -99,7 +96,6 @@ def heartBeat(server):
 	stub=rpc.RpcStub(guid, socket, mds.MDS)
 	(myip, myport)=socket.getsockname()
 	while True:
-		# print 'calling ChunkServerInfo'
 		info=msg.ChunkServerInfo()
 		info.ServiceAddress=CHK_IP
 		info.ServicePort=CHK_PORT
