@@ -101,7 +101,7 @@ def heartBeat(server):
 	while True:
 		# print 'calling ChunkServerInfo'
 		info=msg.ChunkServerInfo()
-		info.ServiceAddress=CHK_IP
+		info.ServiceAddress=myip
 		info.ServicePort=CHK_PORT
 		server.lvm.read_lvs()
 		for lv in server.lvm.softsan_lvs:
@@ -109,7 +109,7 @@ def heartBeat(server):
 			chk=info.chunks[-1]
 			name4guid = lv.name.split('lv_softsan_')[1]
 			Guid.assign(chk.guid, Guid.fromStr(name4guid))
-			chk.size = int(filter(lambda ch: ch in '0123456789.', lv.total).split('.')[0])
+			chk.size = lv.get_sizes(lv.total_extents)
 		stub.callMethod('ChunkServerInfo', info)
 		gevent.sleep(2)
 
