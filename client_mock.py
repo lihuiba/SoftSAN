@@ -22,7 +22,6 @@ guid.d=40
 stub=rpc.RpcStub(guid, socket, mds.MDS)
 
 arg=msg.GetChunkServers_Request()
-# arg.randomCount=3
 ret=stub.callMethod('GetChunkServers', arg)
 print ret.random[0]
 # socket.close()
@@ -36,13 +35,14 @@ if raw_input('you want to NewChunk ? ')=='y':
 	arg2.size=32
 	arg2.count=2
 	ret2=stub2.callMethod('NewChunk', arg2)
-	print ret2.guids[-1]
+	print ret2.guids
 
 if raw_input('you want to assembleVolume ? ')=='y':
 	req_assemble = msg.AssembleVolume_Request()
 	req_assemble.volume.size = 32
 	Guid.assign(req_assemble.volume.guid,ret2.guids[-1])
 	res_assemble = stub2.callMethod('AssembleVolume', req_assemble)
+	print 'access_point:', res_assemble.access_point
 
 if raw_input('you want to DisassembleVolume ? ')=='y':
 	req_disassemble = msg.DisassembleVolume_Request()
@@ -50,10 +50,12 @@ if raw_input('you want to DisassembleVolume ? ')=='y':
 	print 'req_disassemble.access_point:', req_disassemble.access_point
 	stub2.callMethod('DisassembleVolume', req_disassemble)
 
-# if raw_input('you want to DeleteChunk ? ')=='y':
-# 	arg3=msg.DeleteChunk_Request()
-# 	t = arg3.guids.add()
-# 	Guid.assign(t, ret2.guids[-1])
-# 	ret_Del=stub2.callMethod('DeleteChunk', arg3)
+if raw_input('you want to DeleteChunk ? ')=='y':
+	arg3=msg.DeleteChunk_Request()
+	t = arg3.guids.add()
+	Guid.assign(t, ret2.guids[0])
+	t = arg3.guids.add()
+	Guid.assign(t, ret2.guids[1])
+	ret_Del=stub2.callMethod('DeleteChunk', arg3)
 	
 

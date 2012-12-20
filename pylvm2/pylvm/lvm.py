@@ -40,8 +40,6 @@ class LVM:
 		self.__reload_pvs()  # then query PhysicalVolumes
 		self.__reload_lvs()  # then query LogicalVolumes
 
-
-
 	def create_lv(self, vg, lvname, size):
 		unit = size[-1:]
 		if unit in LVM.SIZE_UNITS or unit in LVM.EXTENDS_UNITS:
@@ -62,7 +60,6 @@ class LVM:
 			print output
 			return None
 		return "Invalid Size!"
-
 
 	def remove_lv(self, lv):
 		argv = list()
