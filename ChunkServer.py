@@ -18,7 +18,6 @@ LVNAME='lv_softsan_'
 class ChunkServer:
 
 	def __init__(self):
-
 		self.lvm = Backend.LVM_SOFTSAN()
 		self.tgt = Backend.TGT_SOFTSAN()
 		
@@ -91,8 +90,9 @@ class ChunkServer:
 				ret.error += error
 		return ret
 
+#fixme: reconnect to MDS
 def heartBeat(server):
-	global guid
+	guid=Guid.generate()
 	socket=gevent.socket.socket()
 	socket.connect((MDS_IP, MDS_PORT))
 	stub=rpc.RpcStub(guid, socket, mds.MDS)
@@ -103,8 +103,7 @@ def heartBeat(server):
 		info.ServicePort=CHK_PORT
 		server.lvm.reload_softsan_lvs()
 		for lv in server.lvm.softsan_lvs:
-			info.chunks.add()
-			chk=info.chunks[-1]
+			chk=info.chunks.add()
 			name4guid = lv.name.split('lv_softsan_')[1]
 			Guid.assign(chk.guid, Guid.fromStr(name4guid))
 			chk.size = int(lv.get_sizes(lv.total_extents)[2])
@@ -147,8 +146,6 @@ if __name__=='__main__':
 	# print
 	# print '     test end     '.center(100,'-')
 	server=ChunkServer()
-	guid=msg.Guid()
-	guid.a=1; guid.b=8; guid.c=2; guid.d=1
 	logging.basicConfig(level=logging.DEBUG)	
 	gevent.spawn(heartBeat, server)
 	service=rpc.RpcService(server)
