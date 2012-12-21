@@ -110,11 +110,8 @@ def heartBeat(server):
 		stub.callMethod('ChunkServerInfo', info)
 		gevent.sleep(2)
 
+def test_ChunkServer():
 
-if __name__=='__main__':
-
-
-		
 	# print '     test begin     '.center(100,'-')
 	# print
 	# # mock the newchunk request from client
@@ -137,7 +134,7 @@ if __name__=='__main__':
 
 	# # # mock the delchunk request from client
 	# # req_delchunk = msg.DeleteChunk_Request()
- # # 	for a_guid in ret_newchunk.guids:
+ 	# # for a_guid in ret_newchunk.guids:
 	# # 	t=req_delchunk.guids.add()
 	# # 	Guid.assign(t, a_guid)
 	# # ret_delchunk = server.DeleteChunk(req_delchunk)
@@ -145,6 +142,9 @@ if __name__=='__main__':
 
 	# print
 	# print '     test end     '.center(100,'-')
+
+if __name__=='__main__':
+	
 	server=ChunkServer()
 	logging.basicConfig(level=logging.DEBUG)	
 	gevent.spawn(heartBeat, server)

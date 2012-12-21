@@ -1,7 +1,7 @@
 #/usr/sbin/
 from objects_tgt import *
 from process_call import *
-import re
+import re, logging
 
 def buildArguments(mode, op, **kwargs):
 	ret=["tgtadm", "--lld", "iscsi", "--mode", mode, "--op", op]
@@ -82,7 +82,7 @@ class Tgt:
 	    self.targetlist = []
 	    self.parseLines(output)
 	    if status != 0:
-	        print "error occur reload target"
+	        logging.debug("error occur reload target")
 	    return output
 
 	def is_in_targetlist(self, target_id):
@@ -111,9 +111,9 @@ class Tgt:
 	    argv=buildArguments(mode='target', op='new', tid=target_id, T=target_name)
 	    (status, output) = process_call_argv(argv)
 	    if status != 0:
-	    	print output
+	    	logging.info(output)
 	        return output
-	    print '  New target successfully, target id:',target_id
+	    logging.info('New target successfully, target id:',target_id)
 	    return None
 
 	def bind_target(self, target_id, acl='ALL'):
@@ -121,9 +121,9 @@ class Tgt:
 	    argv=buildArguments(mode='target', op='bind', tid=target_id, I=acl)
 	    (status, output) = process_call_argv(argv)
 	    if status != 0:
-	    	print output
+	    	logging.debug(output)
 	        return output
-	    print '  Bind target successfully, target id:', target_id
+	    logging.info('Bind target successfully, target id:', target_id)
 	    return None
 
 	def unbind_target(self, target_id, acl='ALL'):
@@ -132,8 +132,8 @@ class Tgt:
 	    (status, output) = process_call_argv(argv)
 	    if status != 0:
 	        return output
-       	    print output
-	    print '  Bind target successfully, target id:', target_id
+       	    logging.debug(output)
+	    logging.info('Bind target successfully, target id:', target_id)
 	    return None
 
 	def delete_target(self, target_id):
@@ -141,9 +141,9 @@ class Tgt:
    	    argv=buildArguments(mode='target', op='delete', tid=target_id)
 	    (status, output) = process_call_argv(argv)
 	    if status != 0:
-	    	print output
+	    	logging.debug(output)
 	        return output
-	    print '  Delete target successfully, target id:', target_id
+	    logging.info('Delete target successfully, target id:', target_id)
 	    return None
 
 	def new_lun(self, target_id, path, lun_index='1'):
@@ -151,9 +151,9 @@ class Tgt:
 	    argv = buildArguments(mode='logicalunit', op='new', tid=target_id, lun=lun_index, b=path)
 	    (status, output) = process_call_argv(argv)
 	    if status != 0:
-	    	print output
+	    	logging.debug(output)
 	        return output
-	    print '  New lun successfully, target id:', target_id, 'lun index:',lun_index,'path:', path
+	    logging.info('New lun successfully, target id:', target_id, 'lun index:',lun_index,'path:', path)
 	    return None
 
 	def delete_lun(self, target_id, lun_index='1'):
@@ -161,28 +161,7 @@ class Tgt:
 	    argv = buildArguments(mode='logicalunit', op='delete', tid=target_id, lun=lun_index)
 	    (status, output) = process_call_argv(argv)
 	    if status != 0:
-	    	print output
+	    	logging.debug(output)
 	        return output
-	    print '  Delete lun successfully, target id:', target_id, 'lun index:',lun_index
+	    logging.info('Delete lun successfully, target id:', target_id, 'lun index:',lun_index)
 	    return None
-
-
-
-
-if __name__=="__main__":
-
-	t=Tgt()
-	print '     test begin     '.center(100,'*')
-	print 
-	t.reload()
-	t.print_out()
-	# print len(t.targetlist[0].lunlist)
-
-	# 	for lun in target.lunlist:
-	# 		print '\t', lun
-	# 		for key in lun.__dict__:
-	# 			print '\t\t',key,': ',lun.__dict__[key]
-	print 
-	print '     test end     '.center(100,'*')
-	 
-

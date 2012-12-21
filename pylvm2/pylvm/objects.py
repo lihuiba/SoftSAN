@@ -14,7 +14,6 @@ class Volume:
 		self.attr = attr
 		self.uuid = uuid
 		self.properties = []
-		
 		self.extent_size = 0
 		self.total_extents = None
 		self.allocated_extents = None
@@ -27,7 +26,6 @@ class Volume:
 		self.total_extents = int(total)
 		self.allocated_extents = int(allocated)
 		self.free_extents = self.total_extents - self.allocated_extents
-		
 		self.total = self.__build_size_string(self.total_extents)
 		self.allocated = self.__build_size_string(self.allocated_extents)
 		self.free = self.__build_size_string(self.free_extents)
@@ -80,7 +78,6 @@ class VolumeGroup(Volume):
     
 		self.extent_size = int(extent_size)
 		self.set_extent_count(extents_total, extents_total - extents_free)
-		
 		self.lvs = []
 		self.pvs = []
 		self.max_pvs = pvs_max
@@ -96,13 +93,11 @@ class VolumeGroup(Volume):
 class PhysicalVolume(Volume):
 	def __init__(self, name, vgname, fmt, attr, psize, pfree, initialized, total, alloc):
 		Volume.__init__(self, name, name, vgname, initialized, attr, None)
-		
 		# pv properties in gigabytes
 		self.extent_size = 1024 * 1024
 		extents_total = float(psize) *  1024.0
 		extents_free = float(pfree) * 1024.0
 		self.set_extent_count(extents_total, extents_total - extents_free)
-		
 		self.format = fmt
 		self.type = 0;
 		if not vgname: self.type = 1
@@ -110,19 +105,15 @@ class PhysicalVolume(Volume):
 class LogicalVolume(Volume):
 	def __init__(self, name, path, vgname, used, attrs, uuid, lv_size, ex_size):
 		Volume.__init__(self, name, path, vgname, used, attrs, uuid)
-		
 		# pv properties in gigabytes
 		self.extent_size = int(ex_size)
 		#extents_total = int(lv_size) * int(ex_size)
 		extents_total = int(lv_size)
 		self.set_extent_count(extents_total, int(lv_size) * int(ex_size))
-		
 		self.segments = []
-		
 		self.snapshot_origin = None
 		self.snapshot_usage = 0
 		self.snapshots = []
-		
 		self.stripes = 0
 		
 	

@@ -55,9 +55,9 @@ class LVM:
 			# execute command
 			(status, output) = process_call_argv(argv)
 			if status != 0:
-				print output
+				logging.debug(output)
 				return output
-			print output
+			logging.info(output)
 			return None
 		return "Invalid Size!"
 
@@ -68,10 +68,9 @@ class LVM:
 		argv.append(lv.path)
 		(status, output) = process_call_argv(argv)
 		if status != 0:
-			print "error removing LV"
+			logging.debug("error removing LV")
 			return output
-		
-		print output
+		logging.info(output)
 		return None
 	
 	def get_vgname(self, name):
@@ -93,23 +92,20 @@ class LVM:
 		argv.append("vg_name,vg_attr,vg_size,vg_extent_size,vg_free_count,max_lv,max_pv")
 		(status, output) = process_call_argv(argv)
 		if status != 0:
-			print "error getting list of VG"
+			logging.debug("error getting list of VG")
 			return
 		lines = output.splitlines()
 		for line in lines:
 			line = line.strip()
 			words = line.split(",")
-			
 			vgname = words[0].strip()
 			extent_size = int(words[3])
 			extents_total = int(words[2]) / extent_size
 			extents_free = int(words[4])
-			
 			max_lvs = int(words[5])
 			max_pvs = int(words[6])
 			if max_lvs == 0: max_lvs = 256
 			if max_pvs == 0: max_pvs = 256
-			
 			vg = VolumeGroup(vgname, words[1], extent_size, extents_total, extents_free, max_pvs, max_lvs)
 			self.__vgs[vgname] = vg
 			self.vgs.append(vg);
@@ -130,14 +126,13 @@ class LVM:
 		# execute command
 		(status, output) = process_call_argv(argv)
 		if status != 0:
-			print "error getting list of PV"
+			logging.debug("error getting list of PV")
 			return
 		# parse command output
 		lines = output.splitlines()
 		for line in lines:
 			line = line.strip()
 			words = line.split(",")
-			
 			vgname = words[1]
 			if vgname == '': vgname = None				
 			pv = PhysicalVolume(words[0], vgname, words[2], words[3], words[4], words[5], True, words[6], words[7])
@@ -153,7 +148,7 @@ class LVM:
 		argv.append("-c")
 		(status, output) = process_call_argv(argv)
 		if status != 0:
-			print "error getting list of LV paths"
+			logging.debug("error getting list of LV paths")
 			return
 		# parse command output
 		lines = output.splitlines()
@@ -180,7 +175,7 @@ class LVM:
 		# execute command
 		(status, output) = process_call_argv(argv)
 		if status != 0:
-			print "error getting list of LV"
+			logging.debug("error getting list of LV")
 			return
 		# parse command output
 		lines = output.splitlines()

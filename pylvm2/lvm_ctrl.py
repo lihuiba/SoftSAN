@@ -12,14 +12,13 @@ class LVM2(LVM):
 		argv.append(pvset)
 		(status, output) = process_call_argv(argv)
 		if status != 0:
-			print "error creating VG"
+			logging.debug("error creating VG")
 			return output
 		argv.append(VGCHANGE_BIN_PATH)
 		argv.append('-a y')
 		argv.append(vgname)
-		print argv
 		(status, output) = process_call_argv(argv)
-		print output
+		logging.info(output)
 		if status != 0:
 			return "error activating VG"
 		return None
@@ -30,7 +29,7 @@ class LVM2(LVM):
 		argv.append('-f')
 		argv.append(vgname)
 		(status, output) = process_call_argv(argv)
-		print output
+		logging.info(output)
 		if status != 0:
 			return "error removing VG"
 		return None
@@ -46,7 +45,7 @@ class LVM2(LVM):
 			argv.append(vgname)
 			argv.append(pvname)
 		(status, output) = process_call_argv(argv)
-		print output
+		logging.info(output)
 		if status != 0:
 			return "error reducing VG"
 		return None
@@ -57,7 +56,7 @@ class LVM2(LVM):
 		argv.append(vgname)
 		argv.append(pvname)
 		(status, output) = process_call_argv(argv)
-		print output
+		logging.info(output)
 		if status != 0:
 			return "error extending VG"
 		return None
@@ -69,7 +68,7 @@ class LVM2(LVM):
 		argv.append('-f')
 		argv.append(pvname)
 		(status, output) = process_call_argv(argv)
-		print output
+		logging.info(output)
 		if status != 0:
 			return "error creating PV"
 		return None
@@ -80,7 +79,7 @@ class LVM2(LVM):
 		argv.append('-f')
 		argv.append(pvset)
 		(status, output) = process_call_argv(argv)
-		print output
+		logging.info(output)
 		if status != 0:
 			return "error removing PV"
 		return None
@@ -90,7 +89,7 @@ class LVM2(LVM):
 		argv.append(PVMOVE_BIN_PATH)
 		argv.append(pvname)
 		(status, output) = process_call_argv(argv)
-		print output
+		logging.info(output)
 		if status != 0:
 			return "error moving PV"
 		return None
@@ -103,7 +102,6 @@ class LVM2(LVM):
 			# lv create command
 			argv = list()
 			argv.append(LVCREATE_BIN_PATH)
-			#argv.append("-t") #uncomment to give an error
 			argv.append("-L" if unit in LVM.SIZE_UNITS else "-l")
 			argv.append(size)
 			argv.append("-n")		
@@ -111,9 +109,9 @@ class LVM2(LVM):
 			argv.append(vg.name)
 			(status, output) = process_call_argv(argv)
 			if status != 0:
-				print 'error creating LV'
+				logging.debug('error creating LV')
 				return output
-			print output
+			logging.info(output)
 			return None
 		return "Invalid Size!"
 		
@@ -128,7 +126,7 @@ class LVM2(LVM):
 			argv.append(alter_size)
 			argv.append(lvpath)
 			(status, output) = process_call_argv(argv)
-			print output
+			logging.info(output)
 			if status != 0:
 				return "error extending LV"
 			return None
@@ -144,7 +142,7 @@ class LVM2(LVM):
 			argv.append(alter_size)
 			argv.append(lvpath)
 			(status, output) = process_call_argv(argv)
-			print output
+			logging.info(output)
 			if status != 0:
 				return "error reducing LV"
 			return None	
@@ -156,7 +154,7 @@ class LVM2(LVM):
 		argv.append("-f")
 		argv.append(lvpath)
 		(status, output) = process_call_argv(argv)
-		print output
+		logging.info(output)
 		if status != 0:
 			return "error removING LV"
 		return None
