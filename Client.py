@@ -1,7 +1,7 @@
 import rpc, logging
 import messages_pb2 as msg
 import client_messages_pb2 as clmsg
-import mds, ChkSvr_mock
+import mds, ChunkServer
 import gevent.socket
 import guid as Guid
 import block.dm as dm
@@ -9,8 +9,15 @@ from mds import Object
 import libiscsi
 import scandev
 
-PORT = 6767
+Client_IP = '192.168.0.12'
+Mds_IP = '192.168.0.149'
+ChunkServer_IP = '192.168.0.149'
+Client_Port = 6767
+Mds_Port = 2345
+ChunkServer_Port = 6789
+
 CHUNKSIZE = 5120
+VOLUMEPATH = '/Volume_DB2'
 
 volume_list = {}
 guid=msg.Guid()
@@ -30,63 +37,60 @@ class Client:
 	def NewChunk(self, server, size, count = 1):
 		socket = gevent.socket.socket()
 		socket.connect((server.ServiceAddress, server.ServicePort))
-		stub = rpc.RpcStub(guid, socket, ChkSvr_mock.ChunkServer)
+		stub = rpc.RpcStub(guid, socket, ChunkServer.ChunkServer)
 		arg = msg.NewChunk_Request()
 		arg.size = size
 		arg.count = count
-		# print 'Client_test: arg :'
-		# print arg
 		chunklist = stub.callMethod('NewChunk', arg)
 		return chunklist
-		#print chunklist
 
+    #give a list of chunk sizes, return a list of volumes
+    #volume : path node msg.volume
 	def NewChunkList(self, chksizes):
-		serlist = self.GetChunkServers('192.168.0.12', 2345)
-		# print 'Client_test: serlist = '
-		# print serlist
-		chklist = []
-		nodelist = []
-		server = serlist.random[0]
-		# print 'Client_test: chunksizes = '
-		# print chksizes
-		chunks = self.NewChunk(server, chksizes[0], 2)
+		volumelist = []
 
-		ret = self.MountChunk(Guid.toStr(chunks.guids[0]), '192.168.0.12')
-		chunk = Object()
-		chunk.size = chksizes[0]
-		chunk.path = ret[0]
-		chklist.append(chunk)
-		nodelist.append(ret[1])
+		serlist = self.GetChunkServers(Mds_IP, Mds_Port)
+		print 'serverlist serverlist serverlist serverlist'
+		print serlist
 
-		ret = self.MountChunk(Guid.toStr(chunks.guids[1]), '192.168.0.12')
-		chunk2 = Object()
-		chunk2.size = chksizes[0]
-		chunk2.path = ret[0]
-		chklist.append(chunk2)
-		nodelist.append(ret[1])
-		# print 'Client: chklist = '
-		# for chunk in chklist:
-		# 	print chunk.size
-		# 	print chunk.path
+		volume = Object()
+		volume.info = msg.Volume()
+		for size in chksizes:
+			server = serlist.random[0]
+			chunks = self.NewChunk(server, size, 1)
+			print 'chunks  chunks chunks  chunks chunks  chunks'
+			print chunks
 
-		# for size in chksizes:
-		# 	server = serlist.random[0]
-		# 	chunks = NewChunk(guid, server, size, 1)
-		# 	chunk = Object()
-		# 	chunk.size = size
-		# 	chunk.path = MountChunk(Guid.toStr(chunks.guids[0]), '192.168.0.12')
-		# 	chklist.add(chunk)
-		return chklist, nodelist
+			volume.info.size = size
+			Guid.assign(volume.info.guid, chunks.guids[0])
+			volume.path, volume.node = self.MountChunk(server, volume.info)
 
-	def MountChunk(self, iqn, addr, port = 3260):
-		iqn = 'iqn:'+iqn
-		nodelist = libiscsi.discover_sendtargets(addr, port)
-		for node in nodelist:
-			#print node.name
-			if iqn == node.name:
-				node.login()
-				blkdev = scandev.get_blockdev_by_targetname(iqn)
-				return blkdev, node
+			key = Guid.toStr(volume.info.guid)
+			volumelist[key] = volume
+
+			volumelist.append(volume)
+		print 'volumelist volumelist volumelist volumelist volumelist'
+		print volumelist
+		return volumelist
+
+	def MountChunk(self, server, volume):
+		socket = gevent.socket.socket()
+		socket.connect((server.ServiceAddress, server.ServicePort))
+		stub = rpc.RpcStub(guid, socket, ChunkServer.ChunkServer)
+		req = msg.AssembleVolume_Request()
+		req.volume.size = volume.size
+		Guid.assign(req.volume.guid, volume.guid)
+		target = stub.callMethod('AssembleVolume', req)
+
+		nodelist = libiscsi.discover_sendtargets(server.ServiceAddress, 3260)
+		if nodelist == None:
+			print 'No nodes found!'
+		else:
+			for node in nodelist:
+				if target.access_point == node.name:
+					node.login()
+					dev = scandev.get_blockdev_by_targetname(iqn)
+					return dev, node
 		return 'No found!', None
 
 	def DismountChunk(iqn, nodelist):
@@ -114,62 +118,81 @@ class Client:
 			strat += size
 		dm.map(volumename, tblist)
 
-	def AssembleLinearVolume(self, volumename, chunklist):
+	def AssembleLinearVolume(self, volumename, devlist):
 		tblist = []
 		start = 0
-		for chunk in chunklist:
-			size = chunk.size
-			params = chunk.path + ' 0'
+		for dev in devlist:
+			size = dev.size
+			params = dev.path + ' 0'
 			table = dm.table(start, size, 'linear', params)
 			tblist.append(table)
 			start += size
-		print volumename
-		for table in tblist:
-		 	print table.start; print table.size; print table.params;
+		# print volumename
+		# for table in tblist:
+		#  	print table.start; print table.size; print table.params;
 		dm.map(volumename, tblist)
 
-	def AssembleStripedVolume(self, volumename, strsize, chunklist):
+	def AssembleStripedVolume(self, volumename, strsize, devlist):
 		tblist = []
 		start = 0
 		size = 0
 		dmtype = 'striped'
-		params = str( len(chunklist) ) + ' ' + str( strsize )
-		for chunk in chunklist:
-			size += chunk.size
-			params += ' ' + chunk.path + ' 0'
+		params = str( len(devlist) ) + ' ' + str( strsize )
+		for dev in devlist:
+			size += dev.size
+			params += ' ' + dev.path + ' 0'
 		print params
 		table = dm.table(start, size, dmtype, params)
 		tblist.append(table)
 		dm.map(volumename, tblist)
 
 	def NewVolume(self, req):
+		vollist = []
+		newvolume = msg.Volume()
+
 		volname = req.volume_name
 		volsize = req.volume_size
 		voltype = req.volume_type
 		chksizes = req.chunk_size
-		strsize = req.striped_size
-		if voltype is '':
-			voltype = 'linear'
-		if len(chksizes) is 0:
-			while volsize > CHUNKSIZE:
-				chksizes.append(CHUNKSIZE)
-				volsize -= CHUNKSIZE
-			chksizes.append(volsize)
+		volnames = req.subvolume
+		params = req.params
 
-		ret = self.NewChunkList(chksizes)
-		chklist = ret[0]
-		volume_list[volname] = ret[1]
-		# print 'Client:NewVolume:volume_list:'
-		# for name in volume_list:
-		# 	print name
-		# 	for node in volume_list[name]:
-		# 		print node
+		if len(volnames) > 0:
+			for name in volnames:
+				vollist.append(volume_list[name])
+		
+		if voltype == '':
+			voltype = 'linear'
+		if len(chksizes) == 0 and len(subvolume) == 0:
+			totsize = volsize
+			while totsize > CHUNKSIZE:
+				chksizes.append(CHUNKSIZE)
+				totsize -= CHUNKSIZE
+			chksizes.append(totsize)
+
+		nodelist = []
+		if len(chksizes) > 0:
+			vollist = self.NewChunkList(chksizes)
+		
 		if voltype == 'linear':
-		 	self.AssembleLinearVolume(volname, chklist)
+		 	self.AssembleLinearVolume(volname, vollist)
 		else:
 		  	if strsize is 0:
 		  		strsize = 256
-		  	self.AssembleStripedVolume(volname, strsize, chklist)
+		  	self.AssembleStripedVolume(volname, strsize, vollist)
+
+		newvolume.size = volsize
+		newvolume.assembler = voltype
+		newvolume.parameters = params
+		for volinfo in vollist:
+			newvolume.subvolume.append(volinfo.info)
+		self.WriteVolume(newvolume)
+
+		volumeinfo = Object()
+		volumeinfo.path = '/dev/mapper'+volname
+		volumeinfo.node = None
+		volumeinfo.info = newvolume
+		volume_list[volname] = volumeinfo
 
 		ret = clmsg.NewVolume_Response()
 		ret.name = volname
@@ -188,7 +211,7 @@ class Client:
 
 		print 'DeleteVolume:volume_list is :'
 		print volume_list
-		nodelist = volume_list[volumename]
+		nodelist = volume_list[volumename][1]
 		for node in nodelist:
 			print 'node '+node.name+' is logging out'
 			node.logout()
@@ -199,18 +222,77 @@ class Client:
 		res.result = 'successful'
 		return res
 
+	def WriteVolume(self, name, newvolume):
+		socket = gevent.socket.socket()
+		socket.connect((Mds_IP, Mds_Port))
+		stub = rpc.RpcStub(guid, socket, mds.MDS)
+
+		req = msg.WriteVolume_Request()
+		req.volume = newvolume.SerializeToString()
+		req.fullpath = '/'+name
+
+		ret = stub.callMethod('WriteVolume', req)
+
+		socket.close()
+
+	def DeleteVolume(self, path):
+		socket = gevent.socket.socket()
+		socket.connect((Mds_IP, Mds_Port))
+		stub = rpc.RpcStub(guid, socket, mds.MDS)
+
+		req = msg.DeleteVolume_Request()
+		req.fullpath = path
+
+		ret = stub.callMethod('DeleteVolume', req)
+
+	def ReadVolume(self, name):
+		socket = gevent.socket.socket()
+		socket.connect((Mds_IP, Mds_Port))
+		stub = rpc.RpcStub(guid, socket, mds.MDS)
+
+		req = msg.ReadVolume_Request()
+		req.fullpath = '/'+name
+		ret = stub.callMethod('ReadVolume', req)
+		
+		volume = msg.Volume()
+		volume.ParseFromString(ret.volume)
+		#print 'after parsion:  ', volume
+		return volume
+
+	def MoveVolume(self, source, dest):
+		socket = gevent.socket.socket()
+		socket.connect((Mds_IP, Mds_Port))
+		stub = rpc.RpcStub(guid, socket, mds.MDS)
+
+		req = msg.MoveVolume_Request()
+		req.source = source
+		req.destination = dest
+		ret = stub.callMethod('MoveVolume', req)
+
+def test(server):
+	chksize = 10
+	chksizes = [chksize]
+	server.NewChunkList(chksizes)
+
 if __name__=='__main__':
 	logging.basicConfig(level=logging.DEBUG)
 
 	server=Client()
-	MI = {}
-	req = getattr(clmsg, 'NewVolume_Request', None)
-	res = getattr(clmsg, 'NewVolume_Response', type(None))
-	MI['NewVolume'] = (req, res)
-	req = getattr(clmsg, 'DeleteVolume_Request', None)
-	res = getattr(clmsg, 'DeleteVolume_Response', type(None))
-	MI['DeleteVolume'] = (req, res)
-	print MI
-	service=rpc.RpcService(server, MI)
-	framework=gevent.server.StreamServer(('0.0.0.0', PORT), service.handler)
-	framework.serve_forever()
+	test(server)
+    #################### test read, write volume ###########################
+	# server.WriteVolume(5120, 'linear')
+	# print 'writevolume done'
+	# server.ReadVolume()
+     #################### test read, write volume ###########################
+
+	# MI = {}
+	# req = getattr(clmsg, 'NewVolume_Request', None)
+	# res = getattr(clmsg, 'NewVolume_Response', type(None))
+	# MI['NewVolume'] = (req, res)
+	# req = getattr(clmsg, 'DeleteVolume_Request', None)
+	# res = getattr(clmsg, 'DeleteVolume_Response', type(None))
+	# MI['DeleteVolume'] = (req, res)
+	# # print MI
+	# service=rpc.RpcService(server, MI)
+	# framework=gevent.server.StreamServer(('0.0.0.0', Client_Port), service.handler)
+	# framework.serve_forever()
