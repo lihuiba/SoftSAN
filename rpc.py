@@ -38,7 +38,7 @@ def sendRpc(s, guid, token, name, body):
 	'''Guid token messageName bodySize\n'''
 	line="%s %u %s %u\n" % (Guid.toStr(guid), token, name, len(body))
 	s.sendall(line)
-	s.sendall(body)
+	out = s.sendall(body)
 def recvRpc(s):
 	fd=s.makefile()
 	parts=fd.readline().split()

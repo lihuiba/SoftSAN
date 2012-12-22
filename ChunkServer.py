@@ -5,13 +5,12 @@ import mds
 import gevent.server
 import Backend
 from pytgt.tgt_ctrl import *
-import util 
 import random
 
 MDS_IP='192.168.0.149'
-MDS_PORT=2345
+MDS_PORT=2340
 CHK_IP='192.168.0.149'
-CHK_PORT=6789
+CHK_PORT=6780
 VGNAME='VolGroup'
 LVNAME='lv_softsan_'
 
@@ -19,8 +18,7 @@ class ChunkServer:
 
 	def __init__(self):
 		self.lvm = Backend.LVM_SOFTSAN()
-		self.tgt = Backend.TGT_SOFTSAN()
-		
+		self.tgt = Tgt()
 	
 #  always use lun_index=1. 
 	def AssembleVolume(self, req):
@@ -93,53 +91,56 @@ class ChunkServer:
 #fixme: reconnect to MDS
 def heartBeat(server):
 	guid=Guid.generate()
-	socket=gevent.socket.socket()
-	socket.connect((MDS_IP, MDS_PORT))
-	stub=rpc.RpcStub(guid, socket, mds.MDS)
-	(chunkserver_ip, heartbeat_port)=socket.getsockname()
 	while True:
-		info=msg.ChunkServerInfo()
-		info.ServiceAddress=chunkserver_ip
-		info.ServicePort=CHK_PORT
-		server.lvm.reload_softsan_lvs()
-		for lv in server.lvm.softsan_lvs:
-			chk=info.chunks.add()
-			name4guid = lv.name.split('lv_softsan_')[1]
-			Guid.assign(chk.guid, Guid.fromStr(name4guid))
-			chk.size = int(lv.get_sizes(lv.total_extents)[2])
-		stub.callMethod('ChunkServerInfo', info)
-		gevent.sleep(2)
+		socket=gevent.socket.socket()
+		stub=rpc.RpcStub(guid, socket, mds.MDS)
+		try:
+			socket.connect((MDS_IP, MDS_PORT))
+			chunkserver_ip=socket.getsockname()[0]
+		except Exception as e
+		while True:
+			info=msg.ChunkServerInfo()
+			info.ServiceAddress=chunkserver_ip
+			info.ServicePort=CHK_PORT
+			server.lvm.reload_softsan_lvs()
+			for lv in server.lvm.softsan_lvs:
+				chk=info.chunks.add()
+				name4guid = lv.name.split('lv_softsan_')[1]
+				Guid.assign(chk.guid, Guid.fromStr(name4guid))
+				chk.size = int(lv.get_sizes(lv.total_extents)[2])
+			try:
+				stub.callMethod('ChunkServerInfo', info)
+			except Exception as e:
+				print e,':',type(e)
+				gevent.sleep(2)
+				break
+			gevent.sleep(2)
+
 
 def test_ChunkServer():
-
 	print '     test begin     '.center(100,'-')
 	print
-	# # mock the newchunk request from client
-	# req_newchunk=msg.NewChunk_Request()
-	# req_newchunk.size=32
-	# req_newchunk.count=1
-	# ret_newchunk = server.NewChunk(req_newchunk)
-
-	# # mock the assemblevolume request from client
-	# req_assemblevolume=msg.AssembleVolume_Request()
-	# Guid.assign(req_assemblevolume.volume.guid, ret_newchunk.guids[-1])
-	# req_assemblevolume.volume.size=32
-	# ret_assemblevolume = server.AssembleVolume(req_assemblevolume)
-
-	# # # mock req_disassemblevolume
-	# # req_disassemblevolume = msg.DisassembleVolume_Response()
-	# # req_disassemblevolume.access_point = ret_assemblevolume.access_point
-	# # ret_disassemblevolume = server.DisassembleVolume(req_disassemblevolume)
-	# # print ret_disassemblevolume.access_point
-
-	# # # mock the delchunk request from client
-	# # req_delchunk = msg.DeleteChunk_Request()
- 	# # for a_guid in ret_newchunk.guids:
-	# # 	t=req_delchunk.guids.add()
-	# # 	Guid.assign(t, a_guid)
-	# # ret_delchunk = server.DeleteChunk(req_delchunk)
-
-
+	# mock the newchunk request from client
+	req_newchunk=msg.NewChunk_Request()
+	req_newchunk.size=32
+	req_newchunk.count=1
+	ret_newchunk = server.NewChunk(req_newchunk)
+	# mock the assemblevolume request from client
+	req_assemblevolume=msg.AssembleVolume_Request()
+	Guid.assign(req_assemblevolume.volume.guid, ret_newchunk.guids[-1])
+	req_assemblevolume.volume.size=32
+	ret_assemblevolume = server.AssembleVolume(req_assemblevolume)
+	# mock req_disassemblevolume
+	req_disassemblevolume = msg.DisassembleVolume_Response()
+	req_disassemblevolume.access_point = ret_assemblevolume.access_point
+	ret_disassemblevolume = server.DisassembleVolume(req_disassemblevolume)
+	print ret_disassemblevolume.access_point
+	# mock the delchunk request from client
+	req_delchunk = msg.DeleteChunk_Request()
+ 	for a_guid in ret_newchunk.guids:
+		t=req_delchunk.guids.add()
+		Guid.assign(t, a_guid)
+	ret_delchunk = server.DeleteChunk(req_delchunk)
 	print
 	print '     test end     '.center(100,'-')
 	

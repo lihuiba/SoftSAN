@@ -4,6 +4,8 @@ import logging
 
 class LVM2(LVM):
 
+	def __init__(self):
+		LVM.__init__(self)
 
 	#***********************   vg operator  *************************
 	def vg_create_active(self, vgname, pvset):
@@ -160,6 +162,13 @@ class LVM2(LVM):
 			return "error removING LV"
 		return None
 
+	def haslv(self, lvname):
+		self.reload()
+		for vg in self.vgs:
+			for lv in vg.lvs:
+				if lv.name==lvname:
+					return True
+		return False
 	
 
 
