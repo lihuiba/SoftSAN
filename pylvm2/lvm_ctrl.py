@@ -1,4 +1,5 @@
 from pylvm.lvm import *
+import logging
 
 
 class LVM2(LVM):

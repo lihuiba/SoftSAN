@@ -1,5 +1,5 @@
 #from pylvm import *
-
+import logging
 import os
 from ioutilities import process_call_argv
 from objects import PhysicalVolume,VolumeGroup,LogicalVolume
