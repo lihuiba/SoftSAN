@@ -112,8 +112,8 @@ def heartBeat(server):
 
 def test_ChunkServer():
 
-	# print '     test begin     '.center(100,'-')
-	# print
+	print '     test begin     '.center(100,'-')
+	print
 	# # mock the newchunk request from client
 	# req_newchunk=msg.NewChunk_Request()
 	# req_newchunk.size=32
@@ -140,9 +140,9 @@ def test_ChunkServer():
 	# # ret_delchunk = server.DeleteChunk(req_delchunk)
 
 
-	# print
-	# print '     test end     '.center(100,'-')
-
+	print
+	print '     test end     '.center(100,'-')
+	
 if __name__=='__main__':
 	
 	server=ChunkServer()

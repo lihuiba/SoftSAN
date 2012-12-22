@@ -13,12 +13,13 @@ class LVM_SOFTSAN(pylvm2.lvm_ctrl.LVM2):
 
 	def reload_softsan_lvs(self, vgname_softsan=None):
 		self.reload()
-		self.softsan_lvs=[lv for vg in self.vgs for lv in vg if lv.name.startswith('lv_softsan_')]
-		#for vg in self.vgs:
-		#	for lv in vg.lvs:
-		#		if lv.name.find('lv_softsan_')==0:
-		#			self.softsan_lvs.append(lv)
-		#return None
+		# self.softsan_lvs=[lv for vg in self.vgs for lv in vg if lv.name.startswith('lv_softsan_')]
+		self.softsan_lvs = []
+		for vg in self.vgs:
+			for lv in vg.lvs:
+				if lv.name.find('lv_softsan_')==0:
+					self.softsan_lvs.append(lv)
+		return None
 
 	# fixme: should be put into pylvm2.lvm_ctrl.LVM2, and change the name to 'haslv(self, lvname)'  	
 	def does_lv_exist(self, lvname):
