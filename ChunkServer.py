@@ -12,7 +12,7 @@ MDS_PORT=None
 CHK_IP=None
 CHK_PORT=None
 VGNAME=None
-LVNAME=None
+LVNAME='lv_softsan_'
 
 class ChunkServer:
 	def __init__(self):
@@ -99,7 +99,7 @@ def doHeartBeat(server, stub, socket):
 		server.lvm.reload_softsan_lvs()
 		for lv in server.lvm.softsan_lvs:
 			chk=info.chunks.add()
-			name4guid = lv.name.split('lv_softsan_')[1]
+			name4guid = lv.name.split(LVNAME)[1]
 			Guid.assign(chk.guid, Guid.fromStr(name4guid))
 			chk.size = int(lv.get_sizes(lv.total_extents)[2])
 		stub.callMethod('ChunkServerInfo', info)
@@ -150,8 +150,13 @@ def test_ChunkServer():
 	print '     test end     '.center(100,'-')
 
 def usage():
-	print 'use as follow ...'
-	print 'python ChunkServer.py -a 192.168.0.149 -b 1234 -c 192.168.0.149 5678 VolGroup'
+	print 'Welcome to SoftSAN 0.1,  ChunkServer usage...'
+	print 'python ChunkServer.py -a -b -c -d -n -h'
+	print '-a ip of meatadata server(192.168.0.149) '
+	print '-b port of meatadata server(1234) '
+	print '-c ip of chunkserver(192.168.0.149)'
+	print '-d port of chunkserver(5678)'
+	print '-n name of VolGroup '
 
 def config_from_cmd():
 	global MDS_IP, MDS_PORT, CHK_IP, CHK_PORT, VGNAME
@@ -249,7 +254,7 @@ def default_config():
 		CHK_PORT=6780
 	if VGNAME==None:
 		VGNAME='VolGroup'
-	LVNAME='lv_softsan_'
+	
 	print 'config from default >>> ', 'mdsip:', MDS_IP, 'mdsport:',MDS_PORT, 'vgname:',VGNAME, 'chksvrip:', CHK_IP, 'chksvrport:', CHK_PORT
 
 def softsan_config():
@@ -258,7 +263,7 @@ def softsan_config():
 	default_config()
 
 if __name__=='__main__':
-	global MDS_IP, MDS_PORT, CHK_IP, CHK_PORT, VGNAME, LVNAME
+	
 	softsan_config()	
 	server=ChunkServer()
 	logging.basicConfig(level=logging.DEBUG)	
