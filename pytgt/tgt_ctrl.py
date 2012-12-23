@@ -28,6 +28,7 @@ class Tgt:
 		self.table2=['Driver', 'State']
 		self.table3=['Type', 'SCSI ID', 'SCSI SN', 'Online', 'Removable media', 'Prevent removal', \
 					 'Readonly', 'Backing store type', 'Backing store path', 'Backing store flags']
+		self.reload()
 
 	def parseLines(self, lines):
 		for line in lines:
@@ -165,3 +166,21 @@ class Tgt:
 	        return output
 	    logging.info('Delete lun successfully, target id:', target_id, 'lun index:',lun_index)
 	    return None
+
+	def new_target_lun(self, target_id, target_name, lun_path, acl='ALL'):
+		output = self.new_target(target_id, target_name) 
+		if output != None:
+			logging.debug('Assemble failure:', output)
+			return output
+		output = self.bind_target(target_id, acl)
+		if output != None:
+			self.delete_target(target_id)
+			logging.debug('Assemble failure:', output)
+			return output
+		output = self.new_lun(target_id, lun_path)
+		if output != None:
+			self.delete_target(target_id)
+ 			logging.debug('Assemble failure:', output)
+			return output
+ 		logging.debug('Assemble successfully, target_id:', target_id, 'path:', lun_path)
+		return None

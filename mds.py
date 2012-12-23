@@ -8,6 +8,11 @@ import ChunkServer
 from util import *
 import rpc
 
+MDS_IP='192.168.0.149'
+MDS_PORT=2340
+CHK_IP='192.168.0.149'
+CHK_PORT=6780
+
 def splitbyattr(objs, key):
 	objs.sort(key = lambda x : getattr(x, key))
 	group=None
@@ -182,7 +187,7 @@ def test_main():
 	import gevent.server, rpc
 	server=buildMDS()
 	service=rpc.RpcService(server)
-	framework=gevent.server.StreamServer(('0.0.0.0', 2345), service.handler)
+	framework=gevent.server.StreamServer(('0.0.0.0', MDS_PORT), service.handler)
 	framework.serve_forever()
 
 

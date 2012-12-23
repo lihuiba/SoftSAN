@@ -31,6 +31,9 @@ class LVM:
 	
 	EXTENDS_UNITS = "%1234567890"
 	SIZE_UNITS    = "GMTPE"
+
+	def __init__(self):
+		pass
 	
 	def load(self):
 		self.reload()
