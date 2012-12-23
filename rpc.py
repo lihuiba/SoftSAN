@@ -127,9 +127,6 @@ class RpcStub:
 			self.methodInfo=BuildMethodInfo(Interface)
 		logging.info(self.methodInfo.keys())
 	def callMethod(self, name, argument, socket=None):
-		# print name
-		# if name == 'DisassembleVolume':
-		# 	print 'access_point', argument.access_point
 		MI=self.methodInfo[name]
 		assert type(argument)==MI[0]
 		body=argument.SerializeToString()

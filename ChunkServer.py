@@ -7,15 +7,14 @@ import Backend
 from pytgt.tgt_ctrl import *
 import random
 
-MDS_IP='192.168.0.149'
-MDS_PORT=2340
-CHK_IP='192.168.0.149'
-CHK_PORT=6780
-VGNAME='VolGroup'
-LVNAME='lv_softsan_'
+MDS_IP=None
+MDS_PORT=None
+CHK_IP=None
+CHK_PORT=None
+VGNAME=None
+LVNAME=None
 
 class ChunkServer:
-
 	def __init__(self):
 		self.lvm = Backend.LVM_SOFTSAN()
 		self.tgt = Tgt()
@@ -24,25 +23,25 @@ class ChunkServer:
 	def AssembleVolume(self, req):
 		self.tgt.reload()
 		ret = msg.AssembleVolume_Response()
-		a_guid = req.volume.guid
-		lv_name = LVNAME+Guid.toStr(a_guid)
+		str_guid = Guid.toStr(req.volume.guid)
+		lv_name = LVNAME+str_guid
 		if not self.lvm.does_lv_exist(lv_name):
-			ret.error = (lv_name+'does not exist')
-		else:
-			target_name = "iqn:softsan_"+Guid.toStr(a_guid)
-			target_id = self.tgt.target_name2target_id(target_name)
-			if target_id != None:
-				ret.access_point = target_name
-			else:
-				while True:
-					target_id = str(random.randint(0,1024*1024))
-					if not self.tgt.is_in_targetlist(target_id): 
-						break			
-				lun_path = '/dev/'+VGNAME+'/'+lv_name
-				if self.tgt.assemble(target_id, target_name, lun_path, 'ALL')!=None:
-					ret.error = 'Failed to assemble volume'
-					return ret
-				ret.access_point = target_name
+			ret.error = "Chunk {0} does not exist!".format(str_guid)
+			return ret
+		target_name = "iqn:softsan_"+str_guid
+		target_id = self.tgt.target_name2target_id(target_name)
+		if target_id != None:
+			ret.access_point = target_name
+			return ret
+		while True:
+			target_id = str(random.randint(0,1024*1024))
+			if not self.tgt.is_in_targetlist(target_id): 
+				break			
+		lun_path = '/dev/'+VGNAME+'/'+lv_name
+		if self.tgt.assemble(target_id, target_name, lun_path, 'ALL')!=None:
+			ret.error = "Failed to export chunk {0} with tgt".format(str_guid)
+			return ret
+		ret.access_point = target_name
 		return ret
 		
 	def DisassembleVolume(self, req):
@@ -52,9 +51,9 @@ class ChunkServer:
 		target_id = self.tgt.target_name2target_id(target_name)
 		if target_id==None:
 			ret.error='No such access_point'
-		else:
-			if self.tgt.disassemble(target_id)!=None:
-				ret.error=('failed to Disassemble Volume'+target_name)
+			return ret
+		if self.tgt.disassemble(target_id)!=None:
+			ret.error=('failed to Disassemble Volume'+target_name)
 		return ret
 
 # try to create every requested chunk.however, if some chunk can not be created, fill the ret.error with the output of lvcreate 
@@ -67,12 +66,11 @@ class ChunkServer:
 			lv_name = LVNAME+Guid.toStr(a_guid)
 			lv_size = size
 			output =  self.lvm.lv_create(VGNAME, lv_name, lv_size)
-			if output == None:
-				t=ret.guids.add()
-				Guid.assign(t, a_guid)
-				key=Guid.toTuple(a_guid)
-			else: 
+			if output!=None:
 				ret.error = str(i) + ':' + output + ' '
+				break
+			t=ret.guids.add()
+			Guid.assign(t, a_guid)
 		return ret
 
 # try to delete every requested chunk. if it can not delete, fill the ret.error with output of lvremove
@@ -80,42 +78,49 @@ class ChunkServer:
 		self.lvm.reload()
 		ret = msg.DeleteChunk_Response()
 		for a_guid in req.guids:
-			lv_name = LVNAME+Guid.toStr(a_guid)
+			str_guid=Guid.toStr(a_guid)
+			lv_name = LVNAME+str_guid
 			lv_path = '/dev/'+VGNAME+'/'+lv_name
 			output = self.lvm.lv_remove(lv_path)
 			if output!=None:
-				error += Guid.toStr(a_guid) + ':'+ output+ ' '
-				ret.error += error
+				ret.error = "Unable to delete chunk {0}:\n{1}".format(str_guid, output)
+				break
+			t=ret.guids.add()
+			Guid.assign(t, a_guid)
 		return ret
 
-#fixme: reconnect to MDS
+def doHeartBeat(server, stub, socket):
+	global LVNAME
+	chunkserver_ip=socket.getsockname()[0]
+	while True:
+		info=msg.ChunkServerInfo()
+		info.ServiceAddress=chunkserver_ip
+		info.ServicePort=CHK_PORT
+		server.lvm.reload_softsan_lvs()
+		for lv in server.lvm.softsan_lvs:
+			chk=info.chunks.add()
+			name4guid = lv.name.split('lv_softsan_')[1]
+			Guid.assign(chk.guid, Guid.fromStr(name4guid))
+			chk.size = int(lv.get_sizes(lv.total_extents)[2])
+		stub.callMethod('ChunkServerInfo', info)
+		print 'for test', random.randint(0,100),'________________________________________________________'
+		gevent.sleep(1)
+
 def heartBeat(server):
 	guid=Guid.generate()
+	stub=rpc.RpcStub(guid, None, mds.MDS)
 	while True:
-		socket=gevent.socket.socket()
-		stub=rpc.RpcStub(guid, socket, mds.MDS)
 		try:
-			socket.connect((MDS_IP, MDS_PORT))
-			chunkserver_ip=socket.getsockname()[0]
-		except Exception as e
-		while True:
-			info=msg.ChunkServerInfo()
-			info.ServiceAddress=chunkserver_ip
-			info.ServicePort=CHK_PORT
-			server.lvm.reload_softsan_lvs()
-			for lv in server.lvm.softsan_lvs:
-				chk=info.chunks.add()
-				name4guid = lv.name.split('lv_softsan_')[1]
-				Guid.assign(chk.guid, Guid.fromStr(name4guid))
-				chk.size = int(lv.get_sizes(lv.total_extents)[2])
-			try:
-				stub.callMethod('ChunkServerInfo', info)
-			except Exception as e:
-				print e,':',type(e)
-				gevent.sleep(2)
-				break
+			socket=gevent.socket.socket()
+			out = socket.connect((MDS_IP, MDS_PORT))
+			stub.socket=socket
+			doHeartBeat(server, stub, socket)
+		except KeyboardInterrupt:
+			print "asdf9asdfasdfasdf^C"
+			raise
+		except:
+			logging.error('An error occured during heart beat, preparing to retry', exc_info=1)
 			gevent.sleep(2)
-
 
 def test_ChunkServer():
 	print '     test begin     '.center(100,'-')
@@ -143,9 +148,118 @@ def test_ChunkServer():
 	ret_delchunk = server.DeleteChunk(req_delchunk)
 	print
 	print '     test end     '.center(100,'-')
-	
+
+def usage():
+	print 'use as follow ...'
+	print 'python ChunkServer.py -a 192.168.0.149 -b 1234 -c 192.168.0.149 5678 VolGroup'
+
+def config_from_cmd():
+	global MDS_IP, MDS_PORT, CHK_IP, CHK_PORT, VGNAME
+	import getopt, sys
+	verbose = ["mdsip=", "mdsport=", "chksvrip=", "chksvrport=", "vgname=", "verbose", "help"]
+	abbrev = "a:b:c:d:n:v:h"
+	try:
+		opts, args = getopt.getopt(sys.argv[1:], abbrev, verbose)
+	except getopt.GetoptError, err:
+		print str(err) # will print something like "option -a not recognized"
+		usage()
+		sys.exit(2)
+	mdsip=None
+	mdsport=None
+	chksvrip=None
+	chksvrport=None
+	vgname=None
+	for o, a in opts:
+		if o == ("-v", "--verbose"):
+			print 'SoftSAN 0.1 ......'
+			sys.exit()
+		elif o in ("-h", "--help"):
+			usage()
+			sys.exit()
+		elif o in ("-a", "--mdsip"):
+			mdsip = a
+		elif o in ("-b", "--mdsport"):
+			mdsport = a
+		elif o in ("-c", "--chksvrip"):
+			chksvrip = a
+		elif o in ("-d", "--chksvrport"):
+			chksvrport = a
+		elif o in ("-n", "--name"):
+			vgname = a
+		else:
+			assert False, "unhandled option"
+	if mdsip != None:
+		MDS_IP=mdsip
+	if mdsport != None:
+		MDS_PORT = int(mdsport)
+	if chksvrip != None:
+		CHK_IP = chksvrip
+	if chksvrport != None:
+		CHK_PORT = int(chksvrport)
+	if vgname != None:
+		VGNAME = vgname
+	print 'config from command >>> ', 'mdsip:', MDS_IP, 'mdsport:',MDS_PORT, 'vgname:',VGNAME, 'chksvrip:', CHK_IP, 'chksvrport:', CHK_PORT
+
+def config_from_file(filename='/home/hanggao/SoftSAN/test.conf'):
+	global MDS_IP, MDS_PORT, CHK_IP, CHK_PORT, VGNAME
+	import ConfigParser
+	config = ConfigParser.ConfigParser()
+	config.readfp(open(filename,'rb'))
+	if MDS_IP==None:
+		try:
+			mdsip = config.get('global', 'mdsip')
+			MDS_IP = mdsip
+		except:
+			pass
+	if MDS_PORT==None:
+		try:
+			mdsport = config.get('global', 'mdsport')
+			MDS_PORT = int(mdsport)
+		except:
+			pass
+	if VGNAME==None:
+		try:
+			vgname = config.get('global', 'vgname')
+			VGNAME = vgname
+		except:
+			pass
+	if CHK_IP==None:
+		try:
+			chksvrip = config.get('global', 'chksvrip')
+			CHK_IP = chksvrip
+		except:
+			pass
+	if CHK_PORT==None:
+		try:
+			chksvrport = config.get('global', 'chksvrport')
+			CHK_PORT = int(chksvrport)
+		except:
+			pass
+	print 'config from file >>> ', 'mdsip:', MDS_IP, 'mdsport:',MDS_PORT, 'vgname:',VGNAME, 'chksvrip:', CHK_IP, 'chksvrport:', CHK_PORT
+
+def default_config():
+	global MDS_IP, MDS_PORT, CHK_IP, CHK_PORT, VGNAME
+	if MDS_IP==None:
+		MDS_IP='192.168.0.149'
+	if MDS_PORT==None:
+		MDS_PORT=2340
+	if CHK_IP==None:
+		CHK_IP='192.168.0.149'
+	if CHK_PORT==None:
+		CHK_PORT=6780
+	if VGNAME==None:
+		VGNAME='VolGroup'
+	LVNAME='lv_softsan_'
+	print 'config from default >>> ', 'mdsip:', MDS_IP, 'mdsport:',MDS_PORT, 'vgname:',VGNAME, 'chksvrip:', CHK_IP, 'chksvrport:', CHK_PORT
+
+def softsan_config():
+	config_from_cmd()
+	config_from_file()
+	default_config()
+
 if __name__=='__main__':
-	
+	global MDS_IP, MDS_PORT, CHK_IP, CHK_PORT, VGNAME, LVNAME
+	softsan_config()	
 	server=ChunkServer()
 	logging.basicConfig(level=logging.DEBUG)	
 	gevent.spawn(heartBeat, server)
