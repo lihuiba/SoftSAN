@@ -25,7 +25,7 @@ class ChunkServer:
 		ret = msg.AssembleVolume_Response()
 		str_guid = Guid.toStr(req.volume.guid)
 		lv_name = LVNAME+str_guid
-		if not self.lvm.does_lv_exist(lv_name):
+		if not self.lvm.haslv(lv_name):
 			ret.error = "Chunk {0} does not exist!".format(str_guid)
 			return ret
 		target_name = "iqn:softsan_"+str_guid
@@ -38,7 +38,7 @@ class ChunkServer:
 			if not self.tgt.is_in_targetlist(target_id): 
 				break			
 		lun_path = '/dev/'+VGNAME+'/'+lv_name
-		if self.tgt.assemble(target_id, target_name, lun_path, 'ALL')!=None:
+		if self.tgt.new_target_lun(target_id, target_name, lun_path, 'ALL')!=None:
 			ret.error = "Failed to export chunk {0} with tgt".format(str_guid)
 			return ret
 		ret.access_point = target_name
@@ -52,7 +52,7 @@ class ChunkServer:
 		if target_id==None:
 			ret.error='No such access_point'
 			return ret
-		if self.tgt.disassemble(target_id)!=None:
+		if self.tgt.delete_target(target_id)!=None:
 			ret.error=('failed to Disassemble Volume'+target_name)
 		return ret
 
