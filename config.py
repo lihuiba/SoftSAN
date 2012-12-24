@@ -112,7 +112,7 @@ def default_config():
 	
 	print 'config from default >>> ', 'mdsip:', MDS_IP, 'mdsport:',MDS_PORT, 'vgname:',VGNAME, 'chksvrip:', CHK_IP, 'chksvrport:', CHK_PORT
 
-def softsan_config():
+def softsan_config(filename='/home/hanggao/SoftSAN/test.conf'):
 	config_from_cmd()
-	config_from_file()
+	config_from_file(filename)
 	default_config()
