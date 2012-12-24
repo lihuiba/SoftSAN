@@ -10,18 +10,28 @@ import libiscsi
 import scandev
 
 Client_IP = '192.168.0.12'
-Mds_IP = '192.168.0.149'
-ChunkServer_IP = '192.168.0.149'
+Mds_IP = '192.168.0.12'
+ChunkServer_IP = '192.168.0.12'
 Client_Port = 6767
-Mds_Port = 2345
-ChunkServer_Port = 6789
+Mds_Port = 2340
+ChunkServer_Port = 6780
 
 CHUNKSIZE = 5120
 VOLUMEPATH = '/Volume_DB2'
 
+VolumeDictL = {}#Local volume dictionary
+VolumeDictM = {}#Mds volume dictionary
 volume_list = {}
 guid=msg.Guid()
 guid.a=12; guid.b=13; guid.c=14; guid.d=15;
+
+def assignVolume(a, b):
+	a.size = b.size
+	a.assembler = b.assembler
+	for param in b.parameters:
+		a.parameters.append(param)
+	a.subvolume = b.subvolume
+	Guid.assign(a,guid, b.guid)
 
 class Client:
 	
@@ -53,22 +63,32 @@ class Client:
 		print 'serverlist serverlist serverlist serverlist'
 		print serlist
 
-		volume = Object()
-		volume.info = msg.Volume()
+		mvolume = msg.Volume()
+		lvolume = Object()
 		for size in chksizes:
 			server = serlist.random[0]
 			chunks = self.NewChunk(server, size, 1)
 			print 'chunks  chunks chunks  chunks chunks  chunks'
 			print chunks
 
-			volume.info.size = size
-			Guid.assign(volume.info.guid, chunks.guids[0])
-			volume.path, volume.node = self.MountChunk(server, volume.info)
+			mvolume.size = size
+			lvolume.size = size
+			mvolume.assembler = 'chunk'
+			Guid.assign(mvolume.guid, chunks.guids[0])
+			lvolume.guid = msg.Guid()
+			Guid.assign(lvolume.guid, mvolume.guid)
 
-			key = Guid.toStr(volume.info.guid)
-			volumelist[key] = volume
+			lvolume.path, lvolume.node = self.MountChunk(server, mvolume)
 
-			volumelist.append(volume)
+			key = Guid.toStr(mvolume.guid)
+			VolumeDictL[key] = lvolume
+			VolumeDictM[key] = mvolume
+
+			print 'volume info volume info volume info volume info '
+			print lvolume
+			print mvolume
+
+			volumelist.append(lvolume)
 		print 'volumelist volumelist volumelist volumelist volumelist'
 		print volumelist
 		return volumelist
@@ -77,9 +97,11 @@ class Client:
 		socket = gevent.socket.socket()
 		socket.connect((server.ServiceAddress, server.ServicePort))
 		stub = rpc.RpcStub(guid, socket, ChunkServer.ChunkServer)
+
 		req = msg.AssembleVolume_Request()
 		req.volume.size = volume.size
 		Guid.assign(req.volume.guid, volume.guid)
+		
 		target = stub.callMethod('AssembleVolume', req)
 
 		nodelist = libiscsi.discover_sendtargets(server.ServiceAddress, 3260)
@@ -89,12 +111,11 @@ class Client:
 			for node in nodelist:
 				if target.access_point == node.name:
 					node.login()
-					dev = scandev.get_blockdev_by_targetname(iqn)
+					dev = scandev.get_blockdev_by_targetname(node.name)
 					return dev, node
 		return 'No found!', None
 
 	def DismountChunk(iqn, nodelist):
-		iqn = 'iqn:'+iqn
 		for node in nodelist:
 			if iqn == node.name:
 				node.logout()
@@ -136,21 +157,22 @@ class Client:
 		tblist = []
 		start = 0
 		size = 0
-		dmtype = 'striped'
 		params = str( len(devlist) ) + ' ' + str( strsize )
 		for dev in devlist:
 			size += dev.size
 			params += ' ' + dev.path + ' 0'
 		print params
-		table = dm.table(start, size, dmtype, params)
+		table = dm.table(start, size, 'striped', params)
 		tblist.append(table)
 		dm.map(volumename, tblist)
 
 	def NewVolume(self, req):
 		vollist = []
-		newvolume = msg.Volume()
+		mvolume = msg.Volume()
 
 		volname = req.volume_name
+		if volname in VolumeDictL:
+			print 'volume name has been used! find another one'
 		volsize = req.volume_size
 		voltype = req.volume_type
 		chksizes = req.chunk_size
@@ -159,7 +181,7 @@ class Client:
 
 		if len(volnames) > 0:
 			for name in volnames:
-				vollist.append(volume_list[name])
+				vollist.append(VolumeDictL[name])
 		
 		if voltype == '':
 			voltype = 'linear'
@@ -169,8 +191,7 @@ class Client:
 				chksizes.append(CHUNKSIZE)
 				totsize -= CHUNKSIZE
 			chksizes.append(totsize)
-
-		nodelist = []
+		
 		if len(chksizes) > 0:
 			vollist = self.NewChunkList(chksizes)
 		
@@ -181,23 +202,33 @@ class Client:
 		  		strsize = 256
 		  	self.AssembleStripedVolume(volname, strsize, vollist)
 
-		newvolume.size = volsize
-		newvolume.assembler = voltype
-		newvolume.parameters = params
-		for volinfo in vollist:
-			newvolume.subvolume.append(volinfo.info)
-		self.WriteVolume(newvolume)
+		mvolume.size = volsize
+		mvolume.assembler = voltype
+		mvolume.parameters.append(params)
+		mvolume.guid = Guid.generate()
+		for vol in vollist:
+			key = Guid.toStr(vol.guid)
+			mvolume.subvolume.append( VolumeDictM[key] )
+		key = Guid.toStr(mvolume.guid)
+		VolumeDictM[key] = mvolume
 
-		volumeinfo = Object()
-		volumeinfo.path = '/dev/mapper'+volname
-		volumeinfo.node = None
-		volumeinfo.info = newvolume
-		volume_list[volname] = volumeinfo
+		self.WriteVolume(mvolume)
+
+		lvolume = Object()
+		lvolume.size = volsize
+		lvolume.path = '/dev/mapper'+volname
+		lvolume.node = None
+		lvolume.guid = msg.Guid()
+		Guid.assign(lvolume.guid, mvolume.guid)
+		VolumeDictL[volname] = lvolume
 
 		ret = clmsg.NewVolume_Response()
 		ret.name = volname
 		ret.size = volsize
 		return ret
+
+	def DeleteVolumeAll(self, volume):
+		pass
 
 	def DeleteVolume(self, req):
 		volumename = req.volume_name
@@ -270,9 +301,15 @@ class Client:
 		ret = stub.callMethod('MoveVolume', req)
 
 def test(server):
-	chksize = 10
-	chksizes = [chksize]
-	server.NewChunkList(chksizes)
+	# chksize = 10
+	# chksizes = [chksize]
+	# server.NewChunkList(chksizes)
+
+	req = clmsg.NewVolume_Request()
+	req.volume_name = 'testlinear'
+	req.volume_size = 20
+	req.chunk_size.append(20)
+	server.NewVolume(req)
 
 if __name__=='__main__':
 	logging.basicConfig(level=logging.DEBUG)
