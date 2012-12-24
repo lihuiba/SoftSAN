@@ -7,10 +7,10 @@ import Backend
 from pytgt.tgt_ctrl import *
 import random
 
-MDS_IP=None
-MDS_PORT=None
-CHK_IP=None
-CHK_PORT=None
+MDS_IP='192.168.0.12'
+MDS_PORT=2340
+CHK_IP='192.168.0.12'
+CHK_PORT=6780
 VGNAME=None
 LVNAME='lv_softsan_'
 
