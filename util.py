@@ -14,7 +14,7 @@ class Object:
 
 def message2object(message):
 	"receive a PB message, returns its guid and a object describing the message"
-	import guid as Guid
+	import guid as Guid, messages_pb2 as msg
 	if not hasattr(message, 'ListFields'):
 		return message
 	fields=message.ListFields()

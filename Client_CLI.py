@@ -46,8 +46,10 @@ class Client_CLI:
 	def DeleteChunk(self, server, guids):
 		with BuildStub(guid, server, ChunkServer.ChunkServer) as stub:
 			arg = msg.DeleteChunk_Request()
-			for guid in guids:
-				arg.guids.append(guid)
+			for chunkguid in guids:
+				arg.guids.add()
+				Guid.assign(arg.guids[-1], guid)
+				#arg.guids.append(chunkguid)
 			ret = stub.callMethod('DeleteChunk', arg)
 
 	#give a list of chunk sizes, return a list of volumes
@@ -80,10 +82,9 @@ class Client_CLI:
 			volume.guid = msg.Guid()
 			Guid.assign(volume.guid, chunks.guids[0])
 			volume.path, volume.node = self.MountChunk(server, volume)
-
+			self.UnmountChunk(volumelist)
 			if volume.node == None:
-				self.DismountChunk(volumelist)
-				self.DeleteChunk()
+				self.UnmountChunk(volumelist)
 				print 'Could not mount chunk'
 				return None
 
@@ -116,7 +117,7 @@ class Client_CLI:
 					return dev, node
 		return 'No found!', None
 
-	def DismountChunk(self, volumes):
+	def UnmountChunk(self, volumes):
 		errorinfo = []#record error infomation
 		for volume in volumes:
 			volume.node.logout()
@@ -124,6 +125,8 @@ class Client_CLI:
 				req = msg.DisassembleVolume_Request()
 				req.access_point = volume.node.name
 				ret = stub.callMethod('DisassembleVolume', req)
+			guids = [volume.guid]
+			self.DeleteChunk(volume.server, guids)
 		return errorinfo
 		
 	def NewVolume(self, req):
