@@ -13,6 +13,7 @@ CHK_IP='192.168.0.149'
 CHK_PORT=67802
 
 LVNAME='lv_softsan_'
+VGNAME='VolGroup'
 
 class ChunkServer:
 	def __init__(self):
@@ -77,6 +78,8 @@ class ChunkServer:
 	def DeleteChunk(self, req):
 		self.lvm.reload()
 		ret = msg.DeleteChunk_Response()
+		print 'ChunkServer:  DeleteChunk'
+		print req.guids[0]
 		for a_guid in req.guids:
 			str_guid=Guid.toStr(a_guid)
 			lv_name = LVNAME+str_guid
@@ -151,8 +154,8 @@ def test_ChunkServer():
 
 
 if __name__=='__main__':
-	cfgdict = {'MDS_IP':['M','192.168.0.149'], 'MDS_PORT':['m','6789'], \
-				'CHK_IP':['C','192.168.0.149'], 'CHK_PORT':['c','3456'],'enablexxx':['x',False]}
+	cfgdict = {'MDS_IP':['M','192.168.0.12'], 'MDS_PORT':['m','1234'], \
+				'CHK_IP':['C','192.168.0.12'], 'CHK_PORT':['c','3456'],'enablexxx':['x',False]}
 	cfgfile = '/home/hanggao/SoftSAN/test.conf'
 	configure = config.config(cfgdict, cfgfile)
 	MDS_IP = configure['MDS_IP']

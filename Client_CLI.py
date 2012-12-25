@@ -48,15 +48,12 @@ class Client_CLI:
 			arg = msg.DeleteChunk_Request()
 			for chunkguid in guids:
 				arg.guids.add()
-				Guid.assign(arg.guids[-1], guid)
-				#arg.guids.append(chunkguid)
+				Guid.assign(arg.guids[-1], chunkguid)
 			ret = stub.callMethod('DeleteChunk', arg)
 
 	#give a list of chunk sizes, return a list of volumes
     #volume : path node msg.volume
 	def NewChunkList(self, chksizes):
-		servers = []
-		guids = []
 		volumelist = []
 		Mds = Object()
 		volume = Object()
@@ -64,39 +61,32 @@ class Client_CLI:
 		Mds.ServiceAddress = Mds_IP
 		Mds.ServicePort = Mds_Port
 		serlist = self.GetChunkServers(Mds)
-		print 'serverlist serverlist serverlist serverlist'
-		print serlist
 
 		for size in chksizes:
 			server = serlist.random[0]
 			chunks = self.NewChunk(server, size, 1)
-			print 'chunks  chunks chunks  chunks chunks  chunks'
-			print chunks
-
-			servers.append(server)
-			guids.extend(chunks.guids)
-
+			if chunks == []:
+				pass
+			
 			volume.server = server
 			volume.size = size
 			volume.assembler = 'chunk'
 			volume.guid = msg.Guid()
 			Guid.assign(volume.guid, chunks.guids[0])
 			volume.path, volume.node = self.MountChunk(server, volume)
+
+			#volumelist.append(volume)
+			print volume.guid
 			self.UnmountChunk(volumelist)
 			if volume.node == None:
 				self.UnmountChunk(volumelist)
 				print 'Could not mount chunk'
 				return None
 
+			volumelist.append(volume)
 			key = Guid.toTuple(volume.guid)
 			VolumeDict[key] = volume
 
-			print 'volume info volume info volume info volume info '
-			print volume
-
-			volumelist.append(volume)
-		print 'volumelist volumelist volumelist volumelist volumelist'
-		print volumelist
 		return volumelist
 
 	def MountChunk(self, server, volume):
@@ -125,16 +115,17 @@ class Client_CLI:
 				req = msg.DisassembleVolume_Request()
 				req.access_point = volume.node.name
 				ret = stub.callMethod('DisassembleVolume', req)
+			
 			guids = [volume.guid]
 			self.DeleteChunk(volume.server, guids)
 		return errorinfo
 		
 	def NewVolume(self, req):
 		vollist = []
-		mvolume = msg.Volume()
+		volume = Object()
 
 		volname = req.volume_name
-		if volname in VolumeDictL:
+		if volname in VolumeDict:
 			print 'volume name has been used! find another one'
 		volsize = req.volume_size
 		voltype = req.volume_type
@@ -144,7 +135,9 @@ class Client_CLI:
 
 		if len(volnames) > 0:
 			for name in volnames:
-				vollist.append(VolumeDictL[name])
+				if not name in VolumeDict:
+					pass
+				vollist.append(VolumeDict[name])
 		
 		if voltype == '':
 			voltype = 'linear'
@@ -155,42 +148,34 @@ class Client_CLI:
 				totsize -= CHUNKSIZE
 			chksizes.append(totsize)
 
-
-		
 		if len(chksizes) > 0:
 			vollist = self.NewChunkList(chksizes)
-		
-		if voltype == 'linear':
-		 	self.AssembleLinearVolume(volname, vollist)
-		else:
-		  	if strsize is 0:
-		  		strsize = 256
-		  	self.AssembleStripedVolume(volname, strsize, vollist)
 
-		mvolume.size = volsize
-		mvolume.assembler = voltype
-		mvolume.parameters.append(params)
-		mvolume.guid = Guid.generate()
+		with BuildStub(guid, server, Client.Client) as stub:
+			req = msg.MapVolume_Request()
+			req.volumename = volname
+			req.type = voltype
+			req.params = params
+			for vol in vollist:
+				req.path.append(vol.path)
+				req.size.append(vol.size)
+			ret = stub.callMethod('MapVolume', req)
+
+		#volume = util.message2object(ret.volume)
+		volume.size = volsize
+		volume.assembler = voltype
+		volume.parameters.append(params)
+		volume.guid = Guid.generate()
 		for vol in vollist:
-			key = Guid.toStr(vol.guid)
-			mvolume.subvolume.append( VolumeDictM[key] )
-		key = Guid.toStr(mvolume.guid)
-		VolumeDictM[key] = mvolume
+			pass
 
+		mvolume = msg.Volume()
+		util.object2message(volume, mvolume)
 		self.WriteVolume(mvolume)
 
-		lvolume = Object()
-		lvolume.size = volsize
-		lvolume.path = '/dev/mapper'+volname
-		lvolume.node = None
-		lvolume.guid = msg.Guid()
-		Guid.assign(lvolume.guid, mvolume.guid)
-		VolumeDictL[volname] = lvolume
-
-		ret = clmsg.NewVolume_Response()
-		ret.name = volname
-		ret.size = volsize
-		return ret
+		key = Guid.toTuple(volume.guid)
+		VolumeDict[key] = volume
+		VolumeDict[volname] = volume
 
 	def ListVolume(self):
 		maplist = dm.maps()
@@ -231,7 +216,7 @@ class Client_CLI:
 def test(server):
 	server.ListVolume()
 
-	chksizes = [10, 20]
+	chksizes = [10]
 	server.NewChunkList(chksizes)
 	
 
