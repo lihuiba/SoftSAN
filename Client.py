@@ -115,7 +115,7 @@ class Client:
 					return dev, node
 		return 'No found!', None
 
-	def DismountChunk(iqn, nodelist):
+	def unmountChunk(iqn, nodelist):
 		for node in nodelist:
 			if iqn == node.name:
 				node.logout()
@@ -128,7 +128,7 @@ class Client:
 		for segment in strategy:
 			size = segment.size
 			dmtype = segment.type
-			if dmtpye is 'striped':
+			if dmtype is 'striped':
 				params = str(segment.snum) + ' ' + str(segment.stripesize) + ' '
 			space = ''
 			for chunk in segment.chunklist:
@@ -285,8 +285,7 @@ class Client:
 		req.fullpath = '/'+name
 		ret = stub.callMethod('ReadVolume', req)
 		
-		volume = msg.Volume()
-		volume.ParseFromString(ret.volume)
+		volume = msg.Volume.FromString(ret.volume)
 		#print 'after parsion:  ', volume
 		return volume
 
