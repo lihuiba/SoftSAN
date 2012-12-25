@@ -277,15 +277,7 @@ class Client:
 			req = msg.ReadVolume_Request()
 			req.fullpath = '/'+name
 			ret = stub.callMethod('ReadVolume', req)
-		
-<<<<<<< HEAD
 		volume = msg.Volume.FromString(ret.volume)
-		#print 'after parsion:  ', volume
-=======
-		volume = msg.Volume()
-		volume.ParseFromString(ret.volume)
-
->>>>>>> baf962975a67516f0fe95460f46a540cd3ad004f
 		return volume
 
 	def MoveVolume(self, source, dest):
