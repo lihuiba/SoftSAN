@@ -7,7 +7,10 @@ import Backend
 from pytgt.tgt_ctrl import *
 import random
 
-
+MDS_IP='192.168.0.149'
+MDS_PORT=2340
+CHK_IP='192.168.0.149'
+CHK_PORT=67802
 LVNAME='lv_softsan_'
 
 class ChunkServer:
@@ -91,7 +94,7 @@ def doHeartBeat(server, stub, socket):
 	while True:
 		info=msg.ChunkServerInfo()
 		info.ServiceAddress=chunkserver_ip
-		info.ServicePort=config.CHK_PORT
+		info.ServicePort=CHK_PORT
 		server.lvm.reload_softsan_lvs()
 		for lv in server.lvm.softsan_lvs:
 			chk=info.chunks.add()
@@ -108,7 +111,7 @@ def heartBeat(server):
 	while True:
 		try:
 			socket=gevent.socket.socket()
-			out = socket.connect((config.MDS_IP, config.MDS_PORT))
+			out = socket.connect((MDS_IP, MDS_PORT))
 			stub.socket=socket
 			doHeartBeat(server, stub, socket)
 		except KeyboardInterrupt:
@@ -147,12 +150,18 @@ def test_ChunkServer():
 
 
 if __name__=='__main__':
-	
-	config.softsan_config()	
+	cfgdict = {'MDS_IP':['M','192.168.0.149'], 'MDS_PORT':['m','6789'], \
+				'CHK_IP':['C','192.168.0.149'], 'CHK_PORT':['c','3456']}	
+	cfgfile = '/home/hanggao/SoftSAN/test.conf'
+	configure = config.config(cfgdict, cfgfile)
+	MDS_IP = configure['MDS_IP']
+	MDS_PORT = int(configure['MDS_PORT'])
+	CHK_IP = configure['CHK_IP']
+	CHK_PORT = int(configure['CHK_PORT'])
 	server=ChunkServer()
 	logging.basicConfig(level=logging.DEBUG)	
 	gevent.spawn(heartBeat, server)
 	service=rpc.RpcService(server)
-	framework=gevent.server.StreamServer(('0.0.0.0',config.CHK_PORT), service.handler)
+	framework=gevent.server.StreamServer(('0.0.0.0',CHK_PORT), service.handler)
 	framework.serve_forever()
 	
