@@ -10,6 +10,22 @@ import libiscsi
 import scandev
 from Client import BuildStub
 
+
+Mds_IP = '192.168.0.12'
+Mds_Port = 1234
+ChunkServer_IP = '192.168.0.12'
+ChunkServer_Port = 3456
+Client_IP = '192.168.0.12'
+Client_Port = 6767
+
+CHUNKSIZE = 5120
+
+VolumeDictL = {}#Local volume dictionary
+VolumeDictM = {}#Mds volume dictionary
+VolumeDict = {}
+guid=msg.Guid()
+guid.a=12; guid.b=13; guid.c=14; guid.d=15;
+
 class Client_CLI:
 
 	def GetChunkServers(self, server, count = 5):
@@ -27,41 +43,58 @@ class Client_CLI:
 			chunklist = stub.callMethod('NewChunk', arg)
 		return chunklist
 
+	def DeleteChunk(self, server, guids):
+		with BuildStub(guid, server, ChunkServer.ChunkServer) as stub:
+			arg = msg.DeleteChunk_Request()
+			for chunkguid in guids:
+				arg.guids.add()
+				Guid.assign(arg.guids[-1], guid)
+				#arg.guids.append(chunkguid)
+			ret = stub.callMethod('DeleteChunk', arg)
+
 	#give a list of chunk sizes, return a list of volumes
     #volume : path node msg.volume
 	def NewChunkList(self, chksizes):
+		servers = []
+		guids = []
 		volumelist = []
+		Mds = Object()
+		volume = Object()
 
-		serlist = self.GetChunkServers(Mds_IP, Mds_Port)
+		Mds.ServiceAddress = Mds_IP
+		Mds.ServicePort = Mds_Port
+		serlist = self.GetChunkServers(Mds)
 		print 'serverlist serverlist serverlist serverlist'
 		print serlist
 
-		mvolume = msg.Volume()
-		lvolume = Object()
 		for size in chksizes:
 			server = serlist.random[0]
 			chunks = self.NewChunk(server, size, 1)
 			print 'chunks  chunks chunks  chunks chunks  chunks'
 			print chunks
 
-			mvolume.size = size
-			lvolume.size = size
-			mvolume.assembler = 'chunk'
-			Guid.assign(mvolume.guid, chunks.guids[0])
-			lvolume.guid = msg.Guid()
-			Guid.assign(lvolume.guid, mvolume.guid)
+			servers.append(server)
+			guids.extend(chunks.guids)
 
-			lvolume.path, lvolume.node = self.MountChunk(server, mvolume)
+			volume.server = server
+			volume.size = size
+			volume.assembler = 'chunk'
+			volume.guid = msg.Guid()
+			Guid.assign(volume.guid, chunks.guids[0])
+			volume.path, volume.node = self.MountChunk(server, volume)
+			self.UnmountChunk(volumelist)
+			if volume.node == None:
+				self.UnmountChunk(volumelist)
+				print 'Could not mount chunk'
+				return None
 
-			key = Guid.toStr(mvolume.guid)
-			VolumeDictL[key] = lvolume
-			VolumeDictM[key] = mvolume
+			key = Guid.toTuple(volume.guid)
+			VolumeDict[key] = volume
 
 			print 'volume info volume info volume info volume info '
-			print lvolume
-			print mvolume
+			print volume
 
-			volumelist.append(lvolume)
+			volumelist.append(volume)
 		print 'volumelist volumelist volumelist volumelist volumelist'
 		print volumelist
 		return volumelist
@@ -84,13 +117,18 @@ class Client_CLI:
 					return dev, node
 		return 'No found!', None
 
-	def DismountChunk(iqn, nodelist):
-		for node in nodelist:
-			if iqn == node.name:
-				node.logout()
-				nodelist.remove( node )
-				break
-
+	def UnmountChunk(self, volumes):
+		errorinfo = []#record error infomation
+		for volume in volumes:
+			volume.node.logout()
+			with BuildStub(guid, volume.server, ChunkServer.ChunkServer) as stub:
+				req = msg.DisassembleVolume_Request()
+				req.access_point = volume.node.name
+				ret = stub.callMethod('DisassembleVolume', req)
+			guids = [volume.guid]
+			self.DeleteChunk(volume.server, guids)
+		return errorinfo
+		
 	def NewVolume(self, req):
 		vollist = []
 		mvolume = msg.Volume()
@@ -116,6 +154,8 @@ class Client_CLI:
 				chksizes.append(CHUNKSIZE)
 				totsize -= CHUNKSIZE
 			chksizes.append(totsize)
+
+
 		
 		if len(chksizes) > 0:
 			vollist = self.NewChunkList(chksizes)
@@ -190,6 +230,10 @@ class Client_CLI:
 
 def test(server):
 	server.ListVolume()
+
+	chksizes = [10, 20]
+	server.NewChunkList(chksizes)
+	
 
 if __name__=='__main__':
 	server = Client_CLI()
