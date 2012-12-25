@@ -16,15 +16,6 @@ Client_Port = 6767
 Mds_Port = 2340
 ChunkServer_Port = 6780
 
-CHUNKSIZE = 5120
-VOLUMEPATH = '/Volume_DB2'
-
-VolumeDictL = {}#Local volume dictionary
-VolumeDictM = {}#Mds volume dictionary
-volume_list = {}
-guid=msg.Guid()
-guid.a=12; guid.b=13; guid.c=14; guid.d=15;
-
 
 def assignVolume(a, b):
 	a.size = b.size

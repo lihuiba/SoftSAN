@@ -17,6 +17,9 @@ class Object:
 
 def message2object(message):
 	"receive a PB message, returns its guid and a object describing the message"
+	print message
+	if not hasattr(message, 'ListFields'):
+		return message
 	fields=message.ListFields()
 	rst=Object()
 	for f in fields:
@@ -25,9 +28,9 @@ def message2object(message):
 		if isinstance(value, msg.Guid):
 			value=Guid.toStr(value)
 		else:
-			listable=getattr(value, 'ListFields', None)
-			if listable:
-				value=message2object(value, '')
+			listable=getattr(value, '__delitem__', None)
+			if not listable:
+				value=message2object(value)
 			else:
 				container=getattr(value, '_values', None)
 				if container:
