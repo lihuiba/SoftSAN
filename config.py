@@ -1,8 +1,9 @@
-MDS_IP=None
-MDS_PORT=None
-CHK_IP=None
-CHK_PORT=None
+MDS_IP='192.168.0.12'
+MDS_PORT=2340
+CHK_IP='192.168.0.12'
+CHK_PORT=6780
 VGNAME=None
+
 
 def usage():
 	print 'Welcome to SoftSAN 0.1,  ChunkServer usage...'
