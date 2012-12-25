@@ -8,10 +8,11 @@ import ChunkServer
 from util import *
 import rpc
 
-MDS_IP='192.168.0.12'
-MDS_PORT=2340
-CHK_IP='192.168.0.12'
-CHK_PORT=6780
+MDS_IP='192.168.0.149'
+MDS_PORT=1234
+CHK_IP='192.168.0.149'
+CHK_PORT=4321
+
 
 def splitbyattr(objs, key):
 	objs.sort(key = lambda x : getattr(x, key))

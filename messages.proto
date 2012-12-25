@@ -37,7 +37,7 @@ message ChunkServerInfo {                   //P2S message
     required string ServiceAddress=1;
     required uint32 ServicePort=2;
     optional MachineInfo MachineInfo=3;
-    repeated DiskInfo disks=4;
+    repeated DiskInfo   =4;
     repeated ChunkInfo chunks=5;
     optional LoadInfo load=6;
 }
