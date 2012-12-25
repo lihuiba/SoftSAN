@@ -112,14 +112,13 @@ def heartBeat(server):
 	while True:
 		try:
 			socket=gevent.socket.socket()
-			out = socket.connect((MDS_IP, MDS_PORT))
+			socket.connect((MDS_IP, MDS_PORT))
 			stub.socket=socket
 			doHeartBeat(server, stub, socket)
 		except KeyboardInterrupt:
-			print "asdf9asdfasdfasdf^C"
 			raise
 		except:
-			logging.error('An error occured during heart beat, preparing to retry', exc_info=1)
+			logging.debug('An error occured during heart beat, preparing to retry', exc_info=1)
 			gevent.sleep(2)
 
 def test_ChunkServer():
