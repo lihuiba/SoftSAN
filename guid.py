@@ -18,10 +18,10 @@ def toTuple(x):
 
 def fromTuple(x):
     ret=msg.Guid()
-    ret.a=x.a
-    ret.b=x.b
-    ret.c=x.c
-    ret.d=x.d
+    ret.a=x[0]
+    ret.b=x[1]
+    ret.c=x[2]
+    ret.d=x[3]
     return ret
 
 def generate(guid=None):
