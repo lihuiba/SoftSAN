@@ -1,3 +1,8 @@
+
+
+def help():
+	print '     velcome to SoftSAN 0.1     '.center(100, '-')
+
 MDS_IP='192.168.0.12'
 MDS_PORT=2340
 CHK_IP='192.168.0.12'
@@ -7,113 +12,62 @@ VGNAME=None
 
 def usage():
 	print 'Welcome to SoftSAN 0.1,  ChunkServer usage...'
-	print 'python ChunkServer.py -a -b -c -d -n -h'
-	print '-a ip of meatadata server(192.168.0.149) '
-	print '-b port of meatadata server(1234) '
-	print '-c ip of chunkserver(192.168.0.149)'
-	print '-d port of chunkserver(5678)'
-	print '-n name of VolGroup '
 
-def config_from_cmd():
-	global MDS_IP, MDS_PORT, CHK_IP, CHK_PORT, VGNAME
-	import getopt, sys
-	verbose = ["mdsip=", "mdsport=", "chksvrip=", "chksvrport=", "vgname=", "verbose", "help"]
-	abbrev = "a:b:c:d:n:v:h"
-	try:
-		opts, args = getopt.getopt(sys.argv[1:], abbrev, verbose)
-	except getopt.GetoptError, err:
-		print str(err) # will print something like "option -a not recognized"
-		usage()
-		sys.exit(2)
-	mdsip=None
-	mdsport=None
-	chksvrip=None
-	chksvrport=None
-	vgname=None
-	for o, a in opts:
-		if o == ("-v", "--verbose"):
-			print 'SoftSAN 0.1 ......'
-			sys.exit()
-		elif o in ("-h", "--help"):
-			usage()
-			sys.exit()
-		elif o in ("-a", "--mdsip"):
-			mdsip = a
-		elif o in ("-b", "--mdsport"):
-			mdsport = a
-		elif o in ("-c", "--chksvrip"):
-			chksvrip = a
-		elif o in ("-d", "--chksvrport"):
-			chksvrport = a
-		elif o in ("-n", "--name"):
-			vgname = a
-		else:
-			assert False, "unhandled option"
-	if mdsip != None:
-		MDS_IP=mdsip
-	if mdsport != None:
-		MDS_PORT = int(mdsport)
-	if chksvrip != None:
-		CHK_IP = chksvrip
-	if chksvrport != None:
-		CHK_PORT = int(chksvrport)
-	if vgname != None:
-		VGNAME = vgname
-	print 'config from command >>> ', 'mdsip:', MDS_IP, 'mdsport:',MDS_PORT, 'vgname:',VGNAME, 'chksvrip:', CHK_IP, 'chksvrport:', CHK_PORT
 
-def config_from_file(filename='/home/hanggao/SoftSAN/test.conf'):
-	global MDS_IP, MDS_PORT, CHK_IP, CHK_PORT, VGNAME
+def config(cfgdict, filename, section='test'):
 	import ConfigParser
 	config = ConfigParser.ConfigParser()
 	config.readfp(open(filename,'rb'))
-	if MDS_IP==None:
+	# print 'original value:', cfgdict
+	for key in cfgdict:
 		try:
-			mdsip = config.get('global', 'mdsip')
-			MDS_IP = mdsip
+			cfgdict[key][1] = config.get(section,key)
 		except:
 			pass
-	if MDS_PORT==None:
-		try:
-			mdsport = config.get('global', 'mdsport')
-			MDS_PORT = int(mdsport)
-		except:
-			pass
-	if VGNAME==None:
-		try:
-			vgname = config.get('global', 'vgname')
-			VGNAME = vgname
-		except:
-			pass
-	if CHK_IP==None:
-		try:
-			chksvrip = config.get('global', 'chksvrip')
-			CHK_IP = chksvrip
-		except:
-			pass
-	if CHK_PORT==None:
-		try:
-			chksvrport = config.get('global', 'chksvrport')
-			CHK_PORT = int(chksvrport)
-		except:
-			pass
-	print 'config from file >>> ', 'mdsip:', MDS_IP, 'mdsport:',MDS_PORT, 'vgname:',VGNAME, 'chksvrip:', CHK_IP, 'chksvrport:', CHK_PORT
+	# print 'get value from file:'.ljust(30,' '), cfgdict
+	# get value from command
+	import getopt, sys
+	abbrevstring='h'
+	verbose = ['help']
+	for key in cfgdict:
+		verbose.append(key+'=')
+		if cfgdict[key][0]==None:
+			continue
+		abbrevstring += (cfgdict[key][0]+':') 
+		cfgdict[key][0] = '-'+cfgdict[key][0]
+	print abbrevstring
+	print verbose
+	try:
+		opts, args = getopt.getopt(sys.argv[1:], abbrevstring, verbose)
+	except getopt.GetoptError, err:
+		print str(err) # will print something like "option -a not recognized"
+		print 'type -h or --help to get help'
+		sys.exit(2)
+	# print opts
+	for v in verbose[1:]:
+		v = '--'+v
+		v = v[:-1]
+	for o,a in opts:
+		if o in ('-h','--help'):
+			help()
+			exit()
+		for key in cfgdict:
+			if o in ('--'+key, cfgdict[key][0]):
+				cfgdict[key][1] = a
+	# print 'get value from command:'.ljust(30,' '), cfgdict
+	# check the value, make sure no value equals zero
+	ret_dict = {}
+	for key in cfgdict:
+		if cfgdict[key][1]==None:
+			print 'None value is illegal:', key
+			exit()
+		ret_dict[key] = cfgdict[key][1]
+	return ret_dict
 
-def default_config():
-	global MDS_IP, MDS_PORT, CHK_IP, CHK_PORT, VGNAME
-	if MDS_IP==None:
-		MDS_IP='192.168.0.149'
-	if MDS_PORT==None:
-		MDS_PORT=2340
-	if CHK_IP==None:
-		CHK_IP='192.168.0.149'
-	if CHK_PORT==None:
-		CHK_PORT=6780
-	if VGNAME==None:
-		VGNAME='VolGroup'
-	
-	print 'config from default >>> ', 'mdsip:', MDS_IP, 'mdsport:',MDS_PORT, 'vgname:',VGNAME, 'chksvrip:', CHK_IP, 'chksvrport:', CHK_PORT
-
-def softsan_config(filename='/home/hanggao/SoftSAN/test.conf'):
-	config_from_cmd()
-	config_from_file(filename)
-	default_config()
+if __name__ == '__main__':
+	cfgdict = {'MDS_IP':['M','192.168.0.149'], 'MDS_PORT':['m','6789'], \
+				'CHK_IP':['C','192.168.0.149'], 'CHK_PORT':['c','3456']}
+	cfgfile = '/home/hanggao/SoftSAN/test.conf'
+	argudict = config(cfgdict, cfgfile)
+	for key in argudict:
+		print key, '=', argudict[key],' '
