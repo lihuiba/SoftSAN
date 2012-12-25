@@ -38,11 +38,17 @@ def object2message(object, message):
 	for key in d.keys():
 		if key.startswith('_'):
 			continue
+		value=d[key]
 		try:
-			setattr(message, key, d[key])
+			if isinstance(value, list):
+				appender = (lambda x : repeated.append(x)) if hasattr(message[key], append) \
+					  else (lambda x : object2message(x, repeated.add()))
+				for item in value:
+					appender(item)
+			else:
+				setattr(message, key, d[key])
 		except:
 			pass
-
 
 if __name__ == '__main__':
 	print gethostname('localhost.localdomain')
