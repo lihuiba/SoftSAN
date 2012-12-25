@@ -13,6 +13,7 @@ MDS_PORT=1234
 CHK_IP='192.168.0.149'
 CHK_PORT=4321
 
+
 def splitbyattr(objs, key):
 	objs.sort(key = lambda x : getattr(x, key))
 	group=None

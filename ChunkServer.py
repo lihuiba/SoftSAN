@@ -11,6 +11,7 @@ MDS_IP='192.168.0.149'
 MDS_PORT=2340
 CHK_IP='192.168.0.149'
 CHK_PORT=67802
+
 LVNAME='lv_softsan_'
 
 class ChunkServer:
