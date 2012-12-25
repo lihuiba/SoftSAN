@@ -68,9 +68,11 @@ class Client_CLI:
 			if chunks == []:
 				pass
 			
-			volume.server = server
 			volume.size = size
 			volume.assembler = 'chunk'
+			volume.parameters = []
+			volume.parameters.append(server.ServiceAddress)
+			volume.parameters.append(str(server.ServicePort))
 			volume.guid = msg.Guid()
 			Guid.assign(volume.guid, chunks.guids[0])
 			volume.path, volume.node = self.MountChunk(server, volume)
@@ -167,6 +169,7 @@ class Client_CLI:
 		volume.parameters.append(params)
 		volume.guid = Guid.generate()
 		for vol in vollist:
+			volume.subvolume.append(vol)
 			pass
 
 		mvolume = msg.Volume()
