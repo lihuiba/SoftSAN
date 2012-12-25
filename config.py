@@ -36,8 +36,8 @@ def config(cfgdict, filename, section='test'):
 	except getopt.GetoptError, err:
 		print str(err) # will print something like "option -a not recognized"
 		sys.exit(2)
-	print 'opts:',opts
-	print 'args:',args
+	# print 'opts:',opts
+	# print 'args:',args
 	for o,a in opts:
 		o = o.lstrip('-')
 		for key in cfgdict:
@@ -47,14 +47,27 @@ def config(cfgdict, filename, section='test'):
 				else:
 					cfgdict[key][1] = a
 	# print 'get value from command:'.ljust(20,' '), cfgdict
-	# check the value, make sure no value equals zero
+	# print the help message
+	print 'Usage:'
+	print ' ',
+	print './chunkserver [Options] [value]'
+	print
+	print 'Options:'
+	for key in cfgdict:
+		print ('  --'+key+',').ljust(18,' ',),' ','-'+cfgdict[key][0].ljust(2,' ',),cfgdict[key][2]
+	print
+
+
 	ret_dict = dict([key,cfgdict[key]] for key in cfgdict)
 	return ret_dict
 
 if __name__ == '__main__':
-	cfgdict = {'MDS_IP':['M','192.168.0.149'], 'MDS_PORT':['m','6789'], \
-				'CHK_IP':['C','192.168.0.149'], 'CHK_PORT':['c','3456'],'enablexxx':['x',False]}
+	cfgdict = {'MDS_IP':['M','192.168.0.149','ip address of metadata server'], \
+				'MDS_PORT':['m','6789','port of metadata server'], \
+				'CHK_IP':['C','192.168.0.149','ip address of chunkserver server ************************************************'], \
+				'CHK_PORT':['c','3456',''],\
+				'enablexxx':['x',False,'whether enable x']}
 	cfgfile = '/home/hanggao/SoftSAN/test.conf'
 	argudict = config(cfgdict, cfgfile)
-	for key in argudict:
-		print key, '=', argudict[key],' '
+	# for key in argudict:
+	# 	print key, '=', argudict[key],' '
