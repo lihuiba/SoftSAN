@@ -23,7 +23,7 @@ def config(cfgdict, filename, section='test'):
 	abbrevstring=''
 	verbose = []
 	for key in cfgdict:
-		if cfgdict[key][1]==True or cfgdict[key][1]==False:
+		if isinstance(cfgdict[key][1], bool):
 			verbose.append(key)
 			abbrevstring += cfgdict[key][0]
 		else:
@@ -36,23 +36,19 @@ def config(cfgdict, filename, section='test'):
 	except getopt.GetoptError, err:
 		print str(err) # will print something like "option -a not recognized"
 		sys.exit(2)
-	# print 'opts:',opts
-	# print 'args:',args
+	print 'opts:',opts
+	print 'args:',args
 	for o,a in opts:
-		for i in range(2):
-			if o[0]=='-':
-				o = o[1:]
+		o = o.lstrip('-')
 		for key in cfgdict:
 			if o in (key, cfgdict[key][0]):
-				if cfgdict[key][1]==False:
+				if isinstance(cfgdict[key][1], bool):
 					cfgdict[key][1]=True
 				else:
 					cfgdict[key][1] = a
 	# print 'get value from command:'.ljust(20,' '), cfgdict
 	# check the value, make sure no value equals zero
-	ret_dict = {}
-	for key in cfgdict:
-		ret_dict[key] = cfgdict[key][1]
+	ret_dict = dict([key,cfgdict[key]] for key in cfgdict)
 	return ret_dict
 
 if __name__ == '__main__':
