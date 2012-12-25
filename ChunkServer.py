@@ -154,12 +154,12 @@ if __name__=='__main__':
 	cfgdict = {'MDS_IP':['M','192.168.0.149'], 'MDS_PORT':['m','6789'], \
 				'CHK_IP':['C','192.168.0.149'], 'CHK_PORT':['c','3456'],'enablexxx':['x',False]}
 	cfgfile = '/home/hanggao/SoftSAN/test.conf'
-	configure = config(cfgdict, cfgfile)
+	configure = config.config(cfgdict, cfgfile)
 	MDS_IP = configure['MDS_IP']
 	MDS_PORT = int(configure['MDS_PORT'])
 	CHK_IP = configure['CHK_IP']
 	CHK_PORT = int(configure['CHK_PORT'])
-	
+
 	server=ChunkServer()
 	logging.basicConfig(level=logging.DEBUG)	
 	gevent.spawn(heartBeat, server)

@@ -29,15 +29,15 @@ def config(cfgdict, filename, section='test'):
 		else:
 			verbose.append(key+'=')
 			abbrevstring += (cfgdict[key][0]+':')
-	print 'abbrevstring:', abbrevstring
-	print 'verbose:', verbose
+	# print 'abbrevstring:', abbrevstring
+	# print 'verbose:', verbose
 	try:
 		opts, args = getopt.getopt(sys.argv[1:], abbrevstring, verbose)
 	except getopt.GetoptError, err:
 		print str(err) # will print something like "option -a not recognized"
 		sys.exit(2)
-	print 'opts:',opts
-	print 'args:',args
+	# print 'opts:',opts
+	# print 'args:',args
 	for o,a in opts:
 		for i in range(2):
 			if o[0]=='-':
