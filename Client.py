@@ -49,7 +49,6 @@ class BuildStub:
 	
 class Client:
 	
-<<<<<<< HEAD
 	def GetChunkServers(self, server, count = 5):
 		with BuildStub(guid, server, mds.MDS) as stub:
 			arg = msg.GetChunkServers_Request()
@@ -130,9 +129,6 @@ class Client:
 				break
 
 	def AssembleVolume(strategy, volumename = ''):
-=======
-	def MapVolumeMix(strategy, volumename = ''):
->>>>>>> 6243ce1882f96b59527218ee7c5e1da6074df17c
 		tablist = []
 		start = 0
 		for segment in strategy:
@@ -205,7 +201,6 @@ class Client:
 		res.result = 'successful'
 		return res
 
-<<<<<<< HEAD
 	def WriteVolume(self, server, name, newvolume):
 		with BuildStub(guid, server, mds.MDS) as stub:
 			req = msg.WriteVolume_Request()
@@ -234,8 +229,6 @@ class Client:
 			req.destination = dest
 			ret = stub.callMethod('MoveVolume', req)
 
-=======
->>>>>>> 6243ce1882f96b59527218ee7c5e1da6074df17c
 def test(server):
 	mdsser = Object()
 	mdsser.ServiceAddress = Mds_IP
