@@ -1,6 +1,3 @@
-import messages_pb2 as msg
-import guid as Guid
-
 def gethostname(mdsip):
 	'mdsip: the IP address of MDS'
 	import socket
@@ -17,6 +14,7 @@ class Object:
 
 def message2object(message):
 	"receive a PB message, returns its guid and a object describing the message"
+	import guid as Guid
 	fields=message.ListFields()
 	rst=Object()
 	for f in fields:
@@ -24,22 +22,17 @@ def message2object(message):
 		value=f[1]
 		if isinstance(value, msg.Guid):
 			value=Guid.toStr(value)
+		elif hasattr(value, 'ListFields'):
+			value=message2object(value, '')
+		elif hasattr(value, '_values'):
+			value=[message2object(x) for x in value._values]
 		else:
-			listable=getattr(value, 'ListFields', None)
-			if listable:
-				value=message2object(value, '')
-			else:
-				container=getattr(value, '_values', None)
-				if container:
-					value=[message2object(x) for x in container]
+			pass  #should be a native value like str, int, float, ...			
 		setattr(rst, name, value)
 	return rst
 
 def object2message(object, message):
-	if isinstance(object, dict):
-		d=object
-	else:
-		d=object.__dict__
+	d = object if isinstance(object, dict) else object.__dict__
 	for key in d.keys():
 		if key.startswith('_'):
 			continue
