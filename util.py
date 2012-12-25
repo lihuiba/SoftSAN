@@ -43,7 +43,10 @@ def object2message(object, message):
 	for key in d.keys():
 		if key.startswith('_'):
 			continue
-		setattr(message, key, d[key])
+		try:
+			setattr(message, key, d[key])
+		except:
+			pass
 
 
 if __name__ == '__main__':

@@ -121,7 +121,7 @@ class Client:
 					return dev, node
 		return 'No found!', None
 
-	def DismountChunk(iqn, nodelist):
+	def unmountChunk(iqn, nodelist):
 		for node in nodelist:
 			if iqn == node.name:
 				node.logout()
@@ -134,7 +134,7 @@ class Client:
 		for segment in strategy:
 			size = segment.size
 			dmtype = segment.type
-			if dmtpye is 'striped':
+			if dmtype is 'striped':
 				params = str(segment.snum) + ' ' + str(segment.stripesize) + ' '
 			space = ''
 			for chunk in segment.chunklist:
@@ -145,7 +145,7 @@ class Client:
 			strat += size
 		dm.map(volumename, tblist)
 
-	def AssembleLinearVolume(self, volumename, devlist):
+	def MapLinearVolume(self, volumename, devlist):
 		tblist = []
 		start = 0
 		for dev in devlist:
@@ -159,7 +159,7 @@ class Client:
 		#  	print table.start; print table.size; print table.params;
 		dm.map(volumename, tblist)
 
-	def AssembleStripedVolume(self, volumename, strsize, devlist):
+	def MapStripedVolume(self, volumename, strsize, devlist):
 		tblist = []
 		start = 0
 		size = 0
@@ -172,66 +172,8 @@ class Client:
 		tblist.append(table)
 		dm.map(volumename, tblist)
 
-	def NewVolume(self, req):
-		vollist = []
-		mvolume = msg.Volume()
-
-		volname = req.volume_name
-		if volname in VolumeDictL:
-			print 'volume name has been used! find another one'
-		volsize = req.volume_size
-		voltype = req.volume_type
-		chksizes = req.chunk_size
-		volnames = req.subvolume
-		params = req.params
-
-		if len(volnames) > 0:
-			for name in volnames:
-				vollist.append(VolumeDictL[name])
-		
-		if voltype == '':
-			voltype = 'linear'
-		if len(chksizes) == 0 and len(subvolume) == 0:
-			totsize = volsize
-			while totsize > CHUNKSIZE:
-				chksizes.append(CHUNKSIZE)
-				totsize -= CHUNKSIZE
-			chksizes.append(totsize)
-		
-		if len(chksizes) > 0:
-			vollist = self.NewChunkList(chksizes)
-		
-		if voltype == 'linear':
-		 	self.AssembleLinearVolume(volname, vollist)
-		else:
-		  	if strsize is 0:
-		  		strsize = 256
-		  	self.AssembleStripedVolume(volname, strsize, vollist)
-
-		mvolume.size = volsize
-		mvolume.assembler = voltype
-		mvolume.parameters.append(params)
-		mvolume.guid = Guid.generate()
-		for vol in vollist:
-			key = Guid.toStr(vol.guid)
-			mvolume.subvolume.append( VolumeDictM[key] )
-		key = Guid.toStr(mvolume.guid)
-		VolumeDictM[key] = mvolume
-
-		self.WriteVolume(mvolume)
-
-		lvolume = Object()
-		lvolume.size = volsize
-		lvolume.path = '/dev/mapper'+volname
-		lvolume.node = None
-		lvolume.guid = msg.Guid()
-		Guid.assign(lvolume.guid, mvolume.guid)
-		VolumeDictL[volname] = lvolume
-
-		ret = clmsg.NewVolume_Response()
-		ret.name = volname
-		ret.size = volsize
-		return ret
+	def MapVolume(self, req):
+		pass
 
 	def DeleteVolumeAll(self, volume):
 		pass
@@ -277,10 +219,7 @@ class Client:
 			req = msg.ReadVolume_Request()
 			req.fullpath = '/'+name
 			ret = stub.callMethod('ReadVolume', req)
-		
-		volume = msg.Volume()
-		volume.ParseFromString(ret.volume)
-
+		volume = msg.Volume.FromString(ret.volume)
 		return volume
 
 	def MoveVolume(self, source, dest):
