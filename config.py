@@ -3,9 +3,10 @@ import getopt, sys
 import ConfigParser
 
 def config(cfgdict, filename, section='test'):
-	import ConfigParser
+	fp=open(filename,'rb')
 	config = ConfigParser.ConfigParser()
-	config.readfp(open(filename,'rb'))
+	config.readfp(fp)
+	fp.close()
 	# print 'original value:'.ljust(20,' '), cfgdict
 	for key in cfgdict:
 		try:
@@ -40,12 +41,17 @@ def config(cfgdict, filename, section='test'):
 	# print 'args:',args
 	for o,a in opts:
 		o = o.lstrip('-')
-		for key in cfgdict:
-			if o in (key, cfgdict[key][0]):
-				if isinstance(cfgdict[key][1], bool):
-					cfgdict[key][1]=True
-				else:
-					cfgdict[key][1] = a
+		if o in cfgdict:
+			item=cfgdict[o]
+		else:
+			for key in cfgdict:
+				item=cfgdict[key]
+				if o==item[1]: break
+			assert o==item[1]
+		if isinstance(item[1], bool):
+			item[1]=True
+		else:
+			item[1] = a
 	# print 'get value from command:'.ljust(20,' '), cfgdict
 	# print the help message
 	print 'Usage:'
