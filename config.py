@@ -46,34 +46,23 @@ def config(cfgdict, filename, section='test'):
 		else:
 			for key in cfgdict:
 				item=cfgdict[key]
-				if o==item[1]: break
-			assert o==item[1]
+				if o==item[0]: break
+			assert o==item[0]
 		if isinstance(item[1], bool):
 			item[1]=True
 		else:
 			item[1] = a
 	# print 'get value from command:'.ljust(20,' '), cfgdict
-	ret_dict = dict([key,cfgdict[key]] for key in cfgdict)
-
-	# print the help message
-	lst1 = [key for key in cfgdict]
-	lst2 = [cfgdict[key][0] for key in cfgdict]
-	lst3 = [cfgdict[key][2] for key in cfgdict]	
-	usage(lst1, lst2, lst3)
-	
+	ret_dict = dict([key,cfgdict[key][1]] for key in cfgdict)
+	# print the usage message
+	# usage_print(cfgdict)
 	return ret_dict
 
-def usage(lst1, lst2, lst3, breadth1=5, breadth2=2, breadth3=40):
-	print 'Usage:'
-	print ' ',
-	print './chunkserver [Options] [value]'
-	print
-	print 'Options:'
-	for i in range(len(lst1)):
-		print ('  --'+lst1[i]+',').ljust(breadth1,' ',),' ','-'+lst2[i].ljust(breadth2,' ',)
-		indent_print(lst3[i],breadth3,breadth1+breadth2+10)
-		print
-
+def usage_print(cfgdict, breadth1=5, breadth2=2, breadth3=40):
+	for key in cfgdict:
+		print ('  --'+key+',').ljust(breadth1,' ',),' ','-'+cfgdict[key][0].ljust(breadth2,' ',)
+		indent_print(cfgdict[key][2], breadth3,breadth1+breadth2+10)
+		
 def indent_print(longstr,  breadth=30, indent=25):
 	longstr = string.replace(longstr,'\n',' ')
 	longstr = string.replace(longstr, '\t',' ')
@@ -89,7 +78,6 @@ def indent_print(longstr,  breadth=30, indent=25):
 		else:
 			print head, line
 			line = word+' '
-
 
 if __name__ == '__main__':
 	longstr = '''group directories before files.

@@ -1,16 +1,13 @@
 import rpc, logging
 import messages_pb2 as msg
 import guid as Guid
-import mds, config
+import mds, config, util
 import gevent.server
 import Backend
 from pytgt.tgt_ctrl import *
 import random
 
-MDS_IP='192.168.0.149'
-MDS_PORT=2340
-CHK_IP='192.168.0.149'
-CHK_PORT=67802
+PARAM = None
 
 LVNAME='lv_softsan_'
 VGNAME='VolGroup'
@@ -98,7 +95,7 @@ def doHeartBeat(server, stub, socket):
 	while True:
 		info=msg.ChunkServerInfo()
 		info.ServiceAddress=chunkserver_ip
-		info.ServicePort=CHK_PORT
+		info.ServicePort=int(PARAM.CHK_PORT)
 		server.lvm.reload_softsan_lvs()
 		for lv in server.lvm.softsan_lvs:
 			chk=info.chunks.add()
@@ -115,7 +112,7 @@ def heartBeat(server):
 	while True:
 		try:
 			socket=gevent.socket.socket()
-			socket.connect((MDS_IP, MDS_PORT))
+			socket.connect((PARAM.MDS_IP, int(PARAM.MDS_PORT)))
 			stub.socket=socket
 			doHeartBeat(server, stub, socket)
 		except KeyboardInterrupt:
@@ -153,19 +150,24 @@ def test_ChunkServer():
 
 
 if __name__=='__main__':
-	cfgdict = {'MDS_IP':['M','192.168.0.12'], 'MDS_PORT':['m','1234'], \
-				'CHK_IP':['C','192.168.0.12'], 'CHK_PORT':['c','3456'],'enablexxx':['x',False]}
+	longstr = '''this is a long string example:
+				group directories before files.
+				augment with a --sort option, but any
+				use of --sort=none (-U) disables grouping
+			  '''
+	cfgdict = {'MDS_IP':['M','192.168.0.149','ip address of metadata server'], \
+				'MDS_PORT':['m','6789','port of metadata server'], \
+				'CHK_IP':['C','192.168.0.149',longstr], \
+				'CHK_PORT':['c','3456',''],\
+				'enablexxx':['x',False,'whether enable x']}
+
 	cfgfile = '/home/hanggao/SoftSAN/test.conf'
 	configure = config.config(cfgdict, cfgfile)
-	MDS_IP = configure['MDS_IP']
-	MDS_PORT = int(configure['MDS_PORT'])
-	CHK_IP = configure['CHK_IP']
-	CHK_PORT = int(configure['CHK_PORT'])
-
+	PARAM = util.Object(configure)
 	server=ChunkServer()
 	logging.basicConfig(level=logging.DEBUG)	
 	gevent.spawn(heartBeat, server)
 	service=rpc.RpcService(server)
-	framework=gevent.server.StreamServer(('0.0.0.0',CHK_PORT), service.handler)
+	framework=gevent.server.StreamServer(('0.0.0.0',int(PARAM.CHK_PORT)), service.handler)
 	framework.serve_forever()
 	
