@@ -1,6 +1,6 @@
 import getopt, sys
 import getopt, sys
-import ConfigParser
+import ConfigParser, string
 
 def config(cfgdict, filename, section='test'):
 	import ConfigParser
@@ -47,24 +47,52 @@ def config(cfgdict, filename, section='test'):
 				else:
 					cfgdict[key][1] = a
 	# print 'get value from command:'.ljust(20,' '), cfgdict
+	ret_dict = dict([key,cfgdict[key]] for key in cfgdict)
+
 	# print the help message
+	lst1 = [key for key in cfgdict]
+	lst2 = [cfgdict[key][0] for key in cfgdict]
+	lst3 = [cfgdict[key][2] for key in cfgdict]	
+	usage(lst1, lst2, lst3)
+	
+	return ret_dict
+
+def usage(lst1, lst2, lst3, breadth1=5, breadth2=2, breadth3=40):
 	print 'Usage:'
 	print ' ',
 	print './chunkserver [Options] [value]'
 	print
 	print 'Options:'
-	for key in cfgdict:
-		print ('  --'+key+',').ljust(18,' ',),' ','-'+cfgdict[key][0].ljust(2,' ',),cfgdict[key][2]
-	print
+	for i in range(len(lst1)):
+		print ('  --'+lst1[i]+',').ljust(breadth1,' ',),' ','-'+lst2[i].ljust(breadth2,' ',)
+		indent_print(lst3[i],breadth3,breadth1+breadth2+10)
+		print
 
+def indent_print(longstr,  breadth=30, indent=25):
+	longstr = string.replace(longstr,'\n',' ')
+	longstr = string.replace(longstr, '\t',' ')
+	lst = longstr.split()
+	line = ''
+	head = ''
+	for i in range(indent):
+		head += ' '
+	for word in lst:
+		l = len(word)
+		if (len(line)+l)<breadth:
+			line += (word+' ')
+		else:
+			print head, line
+			line = word+' '
 
-	ret_dict = dict([key,cfgdict[key]] for key in cfgdict)
-	return ret_dict
 
 if __name__ == '__main__':
+	longstr = '''group directories before files.
+				augment with a --sort option, but any
+				use of --sort=none (-U) disables grouping
+			  '''
 	cfgdict = {'MDS_IP':['M','192.168.0.149','ip address of metadata server'], \
 				'MDS_PORT':['m','6789','port of metadata server'], \
-				'CHK_IP':['C','192.168.0.149','ip address of chunkserver server ************************************************'], \
+				'CHK_IP':['C','192.168.0.149',longstr], \
 				'CHK_PORT':['c','3456',''],\
 				'enablexxx':['x',False,'whether enable x']}
 	cfgfile = '/home/hanggao/SoftSAN/test.conf'
