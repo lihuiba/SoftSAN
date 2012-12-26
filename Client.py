@@ -16,7 +16,6 @@ Client_Port = 6767
 Mds_Port = 2340
 ChunkServer_Port = 6780
 
-
 def assignVolume(a, b):
 	a.size = b.size
 	a.assembler = b.assembler
