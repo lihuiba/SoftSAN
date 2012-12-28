@@ -11,28 +11,15 @@ import scandev
 
 Client_IP = '192.168.0.12'
 Mds_IP = '192.168.0.12'
-ChunkServer_IP = '192.168.0.12'
-Client_Port = 6767
-Mds_Port = 2340
-ChunkServer_Port = 6780
+
+Client_Port = 6789
+Mds_Port = 1234
+
 
 VolumeDict = {}
 
 guid=msg.Guid()
 guid.a=12; guid.b=13; guid.c=14; guid.d=15;
-
-class BuildStub:
-	def __init__(self, guid, address, port, interface):
-		self.guid = guid
-		self.addr = address
-		self.port = port
-		self.interface = interface
-	def __enter__(self):
-		self.socket = gevent.socket.socket()
-		self.socket.connect((self.addr, self.port))
-		return rpc.RpcStub(self.guid, self.socket, self.interface)
-	def __exit__(self, a, b, c):
-		self.socket.close()
 	
 class ClientDeamon:
 	
@@ -57,14 +44,11 @@ class ClientDeamon:
 		tblist = []
 		start = 0
 		for dev in devlist:
-			size = dev.size
-			params = dev.path + ' 0'
+			size = dev.size*2048
+			params = dev.parameters[1] + ' 0'
 			table = dm.table(start, size, 'linear', params)
 			tblist.append(table)
 			start += size
-		# print volumename
-		# for table in tblist:
-		#  	print table.start; print table.size; print table.params;
 		dm.map(volumename, tblist)
 
 	def MapStripedVolume(self, volumename, strsize, devlist):
@@ -73,98 +57,78 @@ class ClientDeamon:
 		size = 0
 		params = str( len(devlist) ) + ' ' + str( strsize )
 		for dev in devlist:
-			size += dev.size
-			params += ' ' + dev.path + ' 0'
+			size += dev.size*2048
+			params += ' ' + dev.parameters[1] + ' 0'
 		print params
 		table = dm.table(start, size, 'striped', params)
 		tblist.append(table)
 		dm.map(volumename, tblist)
 
 	def MapVolume(self, req):
-		volumename = req.volumename
-		size = req.size
-		dmtype = req.type
-		params = req.params
-		devlist = []
-		dev = Object()
-		for i < len(req.size):
-			dev.size = req.size[i]
-			dev.path = req.path[i]
+		volumename = req.volume.parameters[0]
+		size = req.volume.size
+		dmtype = req.volume.assembler
 
 		if dmtype == 'linear':
-			self.MapLinearVolume(volumename, devlist)
+			self.MapLinearVolume(volumename, req.volume.subvolumes)
 		elif dmtype == 'striped':
-			stripedsize = int(params)
-			self.MapStripedVolume(volumename, devlist)
+			if len(req.volume.parameters) > 2:
+				param = req.volume.parameters[2]
+				stripedsize = int(req.volume.parameters[2])
+			else:
+				stripedsize = 256
+			self.MapStripedVolume(volumename, stripedsize, req.volume.subvolumes)
 
-		volume.size = volsize
-		volume.assembler = voltype
-		volume.parameters = []
-		volume.parameters.append(volname)
-		volume.parameters.append(params)
-		volume.guid = Guid.generate()
-		volume.subvolume = []
-		for vol in vollist:
-			volume.subvolume.append(vol)
+		VolumeDict[volumename] = req.volume
 
-		mvolume = msg.Volume()
-		util.object2message(volume, mvolume)
-		self.WriteVolume(mvolume)
+		ret = msg.MapVolume_Response()
+		ret.error = ''
+		return ret
 
-		key = Guid.toTuple(volume.guid)
-		VolumeDict[key] = volume
-		VolumeDict[volname] = volume
+	def UnmapVolume(self, req):
+		del VolumeDict[req.name]
+		volume = VolumeDict[name]			
+		for subvolume in volume.subvolumes:
+			VolumeDict[subvolume.parameters[0]] = subvolume
+		ret = msg.UnmapVolume_Response()
+		ret.error = ''
+		return ret
 
-	def DeleteVolume(self, arg = None):
-		if arg == None:
-			print 'Please specify a volume by name or its guid'
-		if isinstance(arg, str):
-			key = arg
-		elif:
-			key = Guid.toTuple(guid)
+	def ClientDeleteVolume(self, req):
+		self.DeleteVolumeTree(req.name)
+		ret = msg.ClientDeleteVolume_Response()
+		ret.error = ''
+		return ret
 
-		if not key in VolumeDict:
-			print 'No such volume found'
-
-		volume = VolumeDict[key]
-
+	def DeleteVolumeTree(self, name):
+		if name in VolumeDict:
+			volume = VolumeDict[name]
+		else:
+			return False
 		if volume.assembler == 'chunk':
-			addr = volume.parameters[0]
-			port = int(volume.parameters[1])
-			volumes = [volume]
-			error = self.UnmountChunk(volumes)
-			return error
-
-		for subvolume in volume.subvolume:
-			error = DelVolume(subvolume.guid)
-
-		mplist = dm.maps()
-		for mp in maplist:
-			if volume.name == mp.name:
-				mp.remove()
-
-		self.DeleteVolume(self, Mds_IP, Mds_Port, volume.name)
-		key = Guid.toTuple(volume.guid)
-		del VolumeDict[key]
+			del VolumeDict[name]
+			return True
+		for subvolume in volume.subvolumes:
+			self.DeleteVolumeTree(subvolume)
+		return True
 
 	def RestoreVolumeInfo(self, volume = None):
-		#self.ReadVolume()
 		mplist = dm.maps()
 		for mp in mplist:
-			retvolume = self.ReadVolume(Mds_IP, Mds_Port, mp.name)
-			if not retvolume == None:
-				volume = util.message2object(retvolume)
-				if volume.assembler == 'chunk':
-					chunkname = LVNAME+Guid.toStr(volume.guid)
-					addr = volume.parameters[0]
-					#port = volume.parameters[1]
-					nodelist = libiscsi.discover_sendtargets(addr, 3260)
-					for node in nodelist:
-						if chunkname == node.name:
-							volume.node = node
-							break
-					key = Guid.toTuple(volume.guid)
-					VolumeDict[key] = volume
+			volume = self.ReadVolume(mp.name)
+			if not volume == None:
+				VolumeDict[mp.name] = volume
+
+	def ReadVolumeInfo(self, name, addr=Mds_IP, port=Mds_Port):
+		if not isinstance(name, str):
+			path = Guid.toStr(name)
+		with BuildStub(guid, addr, port, mds.MDS) as stub:
+			req = msg.ReadVolume_Request()
+			req.fullpath = '/'+path
+			ret = stub.callMethod('ReadVolume', req)
+		volume = msg.Volume()
+		volume.ParseFromString(ret.volume)
+		return volume
 
 def test(server):
 	mdsser = Object()
@@ -185,8 +149,8 @@ def test(server):
 if __name__=='__main__':
 	logging.basicConfig(level=logging.DEBUG)
 
-	server=Client()
-	test(server)
+	server=ClientDeamon()
+	# test(server)
     #################### test read, write volume ###########################
 	# server.WriteVolume(5120, 'linear')
 	# print 'writevolume done'
@@ -201,6 +165,6 @@ if __name__=='__main__':
 	# res = getattr(clmsg, 'DeleteVolume_Response', type(None))
 	# MI['DeleteVolume'] = (req, res)
 	# # print MI
-	# service=rpc.RpcService(server, MI)
-	# framework=gevent.server.StreamServer(('0.0.0.0', Client_Port), service.handler)
-	# framework.serve_forever()
+	service=rpc.RpcService(server)
+	framework=gevent.server.StreamServer(('0.0.0.0', Client_Port), service.handler)
+	framework.serve_forever()
