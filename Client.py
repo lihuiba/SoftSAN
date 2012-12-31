@@ -26,18 +26,35 @@ VolumeDict = {}
 guid=msg.Guid()
 guid.a=12; guid.b=13; guid.c=14; guid.d=15;
 
+
+class SocketPool:
+	def __init__():
+		self.pool={}
+	def getConnection(self, endponit):
+		if endpoint in self.pool:
+			return self.pool[endpoint]
+		socket = gevent.socket.socket()
+		socket.connect(endpoint)
+		self.pool[endpoint]=socket
+		return socket
+	def closeAllConnections(self):
+		for endpoint in self.pool:
+			socket=self.pool[endpoint]
+			del self.pool[endpoint]
+			socket.close()
+
+pool=SocketPool()
+
 class BuildStub:
 	def __init__(self, guid, addr, port, interface):
 		self.guid = guid
-		self.addr = addr
-		self.port = port
+		self.remote = (addr, port)
 		self.interface = interface
 	def __enter__(self):
-		self.socket = gevent.socket.socket()
-		self.socket.connect((self.addr, self.port))
+		self.socket = pool.getConnection(self.endpoint)
 		return rpc.RpcStub(self.guid, self.socket, self.interface)
 	def __exit__(self, a, b, c):
-		self.socket.close()
+		pass
 
 class Client:
 
