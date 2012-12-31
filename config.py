@@ -3,22 +3,25 @@ import getopt, sys
 import ConfigParser, string
 
 def config(cfgdict, filename, section='test'):
-	fp=open(filename,'rb')
-	config = ConfigParser.ConfigParser()
-	config.readfp(fp)
-	fp.close()
-	# print 'original value:'.ljust(20,' '), cfgdict
-	for key in cfgdict:
-		try:
-			value = config.get(section,key)
-			if value.lower()=='true':
-				cfgdict[key][1]=True
-			elif value.lower()=='false':
-				cfgdict[key][1]=False
-			else:
-				cfgdict[key][1]=value
-		except:
-			pass
+	try:
+		fp=open(filename,'rb')
+		config = ConfigParser.ConfigParser()
+		config.readfp(fp)
+		fp.close()
+		# print 'original value:'.ljust(20,' '), cfgdict
+		for key in cfgdict:
+			try:
+				value = config.get(section,key)
+				if value.lower()=='true':
+					cfgdict[key][1]=True
+				elif value.lower()=='false':
+					cfgdict[key][1]=False
+				else:
+					cfgdict[key][1]=value
+			except:
+				pass
+	except:
+		pass
 	# print 'get value from file:'.ljust(20,' '), cfgdict
 	# get value from command
 	abbrevstring=''
