@@ -8,252 +8,309 @@ import block.dm as dm
 from mds import Object
 import libiscsi
 import scandev
+import ClientDeamon
+from util import message2object as msg2obj
+from util import object2message as obj2msg
 
-Client_IP = '192.168.0.12'
+
 Mds_IP = '192.168.0.12'
-ChunkServer_IP = '192.168.0.12'
-Client_Port = 6767
-Mds_Port = 2340
-ChunkServer_Port = 6780
+Mds_Port = 1234
+Client_IP = '192.168.0.12'
+Client_Port = 6789
 
-def assignVolume(a, b):
-	a.size = b.size
-	a.assembler = b.assembler
-	for param in b.parameters:
-		a.parameters.append(param)
-	for volume in b.subvolume:
-		a.subvolume.append(volume)
-	Guid.assign(a,guid, b.guid)
+CHUNKSIZE = 12
+
+LVNAME='lv_softsan_'
+
+VolumeDict = {}
+guid=msg.Guid()
+guid.a=12; guid.b=13; guid.c=14; guid.d=15;
 
 class BuildStub:
-	def __init__(self, guid, server, interface):
+	def __init__(self, guid, addr, port, interface):
 		self.guid = guid
-		self.server = server
+		self.addr = addr
+		self.port = port
 		self.interface = interface
 	def __enter__(self):
 		self.socket = gevent.socket.socket()
-		self.socket.connect((self.server.ServiceAddress, self.server.ServicePort))
+		self.socket.connect((self.addr, self.port))
 		return rpc.RpcStub(self.guid, self.socket, self.interface)
 	def __exit__(self, a, b, c):
 		self.socket.close()
-	
+
 class Client:
-	
-	def GetChunkServers(self, server, count = 5):
-		with BuildStub(guid, server, mds.MDS) as stub:
+
+	def GetChunkServers(self, addr, port, count = 5):
+		with BuildStub(guid, addr, port, mds.MDS) as stub:
 			arg = msg.GetChunkServers_Request()
 			arg.randomCount = count
 			serverlist = stub.callMethod('GetChunkServers', arg)
 		return serverlist
 
-	def NewChunk(self, server, size, count = 1):
-		with BuildStub(guid, server, ChunkServer.ChunkServer) as stub:
+	def NewChunk(self, addr, port, size, count = 1):
+		with BuildStub(guid, addr, port, ChunkServer.ChunkServer) as stub:
 			arg = msg.NewChunk_Request()
 			arg.size = size
 			arg.count = count
 			chunklist = stub.callMethod('NewChunk', arg)
 		return chunklist
 
-    #give a list of chunk sizes, return a list of volumes
+	def DeleteChunk(self, addr, port, guids):
+		with BuildStub(guid, addr, port, ChunkServer.ChunkServer) as stub:
+			arg = msg.DeleteChunk_Request()
+			for chunkguid in guids:
+				arg.guids.add()
+				Guid.assign(arg.guids[-1], chunkguid)
+			ret = stub.callMethod('DeleteChunk', arg)
+
+	#give a list of chunk sizes, return a list of volumes
     #volume : path node msg.volume
 	def NewChunkList(self, chksizes):
 		volumelist = []
+		
 
 		serlist = self.GetChunkServers(Mds_IP, Mds_Port)
-		print 'serverlist serverlist serverlist serverlist'
-		print serlist
 
-		mvolume = msg.Volume()
-		lvolume = Object()
 		for size in chksizes:
 			server = serlist.random[0]
-			chunks = self.NewChunk(server, size, 1)
-			print 'chunks  chunks chunks  chunks chunks  chunks'
-			print chunks
+			addr = server.ServiceAddress
+			port = server.ServicePort
+			chunks = self.NewChunk(addr, port, size, 1)
+			if chunks == []:
+				pass
+			
+			print 'chunksize: ', size
+			volume = Object()
+			volume.size = size
+			volume.assembler = 'chunk'
+			volume.guid = Guid.toStr(chunks.guids[0])
+			path, nodename = self.MountChunk(addr, port, volume)
+			volume.parameters = [volume.guid, path, nodename,
+			server.ServiceAddress, str(server.ServicePort)]
 
-			mvolume.size = size
-			lvolume.size = size
-			mvolume.assembler = 'chunk'
-			Guid.assign(mvolume.guid, chunks.guids[0])
-			lvolume.guid = msg.Guid()
-			Guid.assign(lvolume.guid, mvolume.guid)
+			if path == None:
+				self.UnmountChunk(volumelist)
+				print 'Could not mount chunk'
+				return None
 
-			lvolume.path, lvolume.node = self.MountChunk(server, mvolume)
-
-			key = Guid.toStr(mvolume.guid)
-			VolumeDictL[key] = lvolume
-			VolumeDictM[key] = mvolume
-
-			print 'volume info volume info volume info volume info '
-			print lvolume
-			print mvolume
-
-			volumelist.append(lvolume)
-		print 'volumelist volumelist volumelist volumelist volumelist'
-		print volumelist
+			volumelist.append(volume)
 		return volumelist
 
-	def MountChunk(self, server, volume):
-		with BuildStub(guid, server, ChunkServer.ChunkServer) as stub:
+	def AssembleVolume(self, addr, port, volume):
+		with BuildStub(guid, addr, port, ChunkServer.ChunkServer) as stub:
 			req = msg.AssembleVolume_Request()
-			req.volume.size = volume.size
-			Guid.assign(req.volume.guid, volume.guid)
+			obj2msg(volume, req.volume)
 			target = stub.callMethod('AssembleVolume', req)
+			print target.access_point
+			return target
 
-		nodelist = libiscsi.discover_sendtargets(server.ServiceAddress, 3260)
-		if nodelist == None:
-			print 'No nodes found!'
-		else:
-			for node in nodelist:
-				if target.access_point == node.name:
-					node.login()
-					dev = scandev.get_blockdev_by_targetname(node.name)
-					return dev, node
-		return 'No found!', None
+	def DisassembleVolume(self, addr, port, nodename):
+		with BuildStub(guid, addr, port, ChunkServer.ChunkServer) as stub:
+			req = msg.DisassembleVolume_Request()
+			req.access_point = nodename
+			ret = stub.callMethod('DisassembleVolume', req)
 
-	def unmountChunk(iqn, nodelist):
+	def GetChunkNode(self, name, addr, port=3260):
+		nodelist = libiscsi.discover_sendtargets(addr, port)
 		for node in nodelist:
-			if iqn == node.name:
+			if name == node.name:
+				return node
+		return None
+
+	def MountChunk(self, addr, port, volume):
+		target = self.AssembleVolume(addr, port, volume)
+		node = self.GetChunkNode(target.access_point, addr)
+		if not node == None:
+			node.login()
+			dev = scandev.get_blockdev_by_targetname(node.name)
+			if not dev == None:
+				return dev, node.name
+		return None, None
+
+	def UnmountChunk(self, volumes):
+		print 'removing chunks......'
+		if not isinstance(volumes, list):
+			volumes = [volumes]
+		errorinfo = []#record error infomation
+		for volume in volumes:
+			addr = volume.parameters[3]
+			port = int(volume.parameters[4])
+			nodename = volume.parameters[2]
+			print 'nodename: ', nodename
+			node = self.GetChunkNode(nodename, addr)
+			if not node == None:
 				node.logout()
-				nodelist.remove( node )
-				break
+			self.DisassembleVolume(addr, port, nodename)
+			if isinstance(volume.guid, str)	== True:
+				guids = [Guid.fromStr(volume.guid)]
+			else:
+				guids = [volume.guid]
+			self.DeleteChunk(addr, port, guids)
+		return errorinfo
+		
+	def MapVolume(self, volume, addr=Client_IP, port=Client_Port):
+		with BuildStub(guid, addr, port, ClientDeamon.ClientDeamon) as stub:
+			req = msg.MapVolume_Request()
+			obj2msg(volume, req.volume)
+			ret = stub.callMethod('MapVolume', req)
+		if ret.error == '':
+			return True
+		return False
 
-	def AssembleVolume(strategy, volumename = ''):
-		tablist = []
-		start = 0
-		for segment in strategy:
-			size = segment.size
-			dmtype = segment.type
-			if dmtype is 'striped':
-				params = str(segment.snum) + ' ' + str(segment.stripesize) + ' '
-			space = ''
-			for chunk in segment.chunklist:
-				params += space + chunk.path + ' ' + str(chunk.size)
-				space = ' '
-			table = dm.table(start, size, dmtype, params)
-			tblist.append(table)
-			strat += size
-		dm.map(volumename, tblist)
+	def UnmapVolume(self, volumename, addr=Client_IP, port=Client_Port):
+		with BuildStub(guid, addr, port, ClientDeamon.ClientDeamon) as stub:
+			req = msg.UnmapVolume_Request()
+			req.name = volumename
+			ret = stub.callMethod('UnmapVolume', req)
 
-	def MapLinearVolume(self, volumename, devlist):
-		tblist = []
-		start = 0
-		for dev in devlist:
-			size = dev.size
-			params = dev.path + ' 0'
-			table = dm.table(start, size, 'linear', params)
-			tblist.append(table)
-			start += size
-		# print volumename
-		# for table in tblist:
-		#  	print table.start; print table.size; print table.params;
-		dm.map(volumename, tblist)
+		volume = self.ReadVolumeInfo(volumename)
+		for subvol in volume.subvolumes:
+			self.WriteVolumeInfo(subvol)
+		self.DeleteVolumeInfo(volume)
 
-	def MapStripedVolume(self, volumename, strsize, devlist):
-		tblist = []
-		start = 0
-		size = 0
-		params = str( len(devlist) ) + ' ' + str( strsize )
-		for dev in devlist:
-			size += dev.size
-			params += ' ' + dev.path + ' 0'
-		print params
-		table = dm.table(start, size, 'striped', params)
-		tblist.append(table)
-		dm.map(volumename, tblist)
+	def NewVolume(self, arg):
+		vollist = []
+		volume = Object()
 
-	def MapVolume(self, req):
-		pass
+		volname = arg.name
+		if volname in VolumeDict:
+			print 'volume name has been used! find another one'
+		volsize = arg.size
+		voltype = arg.type
+		chksizes = arg.chunksizes
+		volnames = arg.subvolumes
+		params = arg.params
 
-	def DeleteVolumeAll(self, volume):
-		pass
+		if len(volnames) > 0:
+			for name in volnames:
+				ret = self.ReadVolumeInfo(name)
+				vol = msg2obj(ret)
+				if vol == None:
+					pass
+				vollist.append(vol)
+		
+		if voltype == '':
+			voltype = 'linear'
+		if len(chksizes) == 0 and len(volnames) == 0:
+			totsize = volsize
+			while totsize > CHUNKSIZE:
+				chksizes.append(CHUNKSIZE)
+				totsize -= CHUNKSIZE
+			chksizes.append(totsize)
 
-	def DeleteVolume(self, req):
-		volumename = req.volume_name
-		print 'DeleteVolume:volumename is :    ' + volumename
+		if len(chksizes) > 0:
+			vollist = self.NewChunkList(chksizes)
+			if vollist == None:
+				pass
+			for vol in vollist:
+				print 'vol.size: ', vol.size
+				msgvol = msg.Volume()
+				obj2msg(vol, msgvol)
+				self.WriteVolumeInfo(msgvol)
+
+		volume.size = volsize
+		volume.assembler = voltype
+		volume.subvolumes = vollist
+		volume.guid = Guid.toStr(Guid.generate())
+		volume.parameters = [volname, '/dev/mapper/'+volname]
+		volume.parameters.extend(params)
+		ret = self.MapVolume(volume)
+		if ret == None:
+			self.UnmountChunk(vollist)
+			pass
+		msgvolume = msg.Volume()
+		obj2msg(volume, msgvolume)
+		self.WriteVolumeInfo(msgvolume)
+
+	def DeleteVolume(self, name):
+		self.DeleteVolumeTree(name)
+		self.DeleteVolumeInfo(name)
+		with BuildStub(guid, Client_IP, Client_Port, ClientDeamon.ClientDeamon) as stub:
+			req = msg.ClientDeleteVolume_Request()
+			req.name = name
+			ret = stub.callMethod('ClientDeleteVolume', req)
+
+	def DeleteVolumeTree(self, volume):
+		if isinstance(volume, str):
+			volume = self.ReadVolumeInfo(volume)
+		if volume.assembler == 'chunk':
+			self.UnmountChunk(volume)
+			return True
+		mps = dm.maps()
+		name = volume.parameters[0]
+		for mp in mps:
+			if name == mp.name:
+				mp.remove()
+		for subvolume in volume.subvolumes:
+			self.DeleteVolumeTree(subvolume)
+
+	def ListVolume(self):
 		maplist = dm.maps()
 		for mp in maplist:
-			if mp.name == volumename:
-				mp.remove()
-				print 'DeleteleVolume:Disassemble successful'
-				break
+			print mp.name
 
-		print 'DeleteVolume:volume_list is :'
-		print volume_list
-		nodelist = volume_list[volumename][1]
-		for node in nodelist:
-			print 'node '+node.name+' is logging out'
-			node.logout()
-		del volume_list[volumename]
-		print 'DeleteleVolume:Dismount nodes successful'
-
-		res = clmsg.DeleteVolume_Response()
-		res.result = 'successful'
-		return res
-
-	def WriteVolume(self, server, name, newvolume):
-		with BuildStub(guid, server, mds.MDS) as stub:
+	def WriteVolumeInfo(self, volume, addr=Mds_IP, port=Mds_Port):
+		if isinstance(volume, str) == True:
+			path = volume
+		else:
+			path = volume.parameters[0]
+		with BuildStub(guid, addr, port, mds.MDS) as stub:
 			req = msg.WriteVolume_Request()
-			req.volume = newvolume.SerializeToString()
-			req.fullpath = '/'+name
+			req.volume = volume.SerializeToString()
+			req.fullpath = '/'+path
 			ret = stub.callMethod('WriteVolume', req)
 
-	def DeleteVolume(self, server, path):
-		with BuildStub(guid, server, mds.MDS) as stub:
+	def DeleteVolumeInfo(self, volume, addr=Mds_IP, port=Mds_Port):
+		if isinstance(volume, str) == True:
+			path = volume
+		else:
+			path = volume.parameters[0]
+		with BuildStub(guid, addr, port, mds.MDS) as stub:
 			req = msg.DeleteVolume_Request()
-			req.fullpath = path
+			req.fullpath = '/'+path
 			ret = stub.callMethod('DeleteVolume', req)
 
-	def ReadVolume(self, name):
-		with BuildStub(guid, server, mds.MDS) as stub:
+	def ReadVolumeInfo(self, name, addr=Mds_IP, port=Mds_Port):
+		if isinstance(name, str) == True:
+			path = name
+		else:
+			path = Guid.toStr(name)
+		with BuildStub(guid, addr, port, mds.MDS) as stub:
 			req = msg.ReadVolume_Request()
-			req.fullpath = '/'+name
+			req.fullpath = '/'+path
 			ret = stub.callMethod('ReadVolume', req)
-		volume = msg.Volume.FromString(ret.volume)
+		volume = msg.Volume()
+		volume.ParseFromString(ret.volume)
 		return volume
 
-	def MoveVolume(self, source, dest):
-		with BuildStub(guid, server, mds.MDS) as stub:
+	def MoveVolumeInfo(self, source, dest, addr=Mds_IP, port=Mds_Port):
+		with BuildStub(guid, addr, port, mds.MDS) as stub:
 			req = msg.MoveVolume_Request()
 			req.source = source
 			req.destination = dest
 			ret = stub.callMethod('MoveVolume', req)
 
 def test(server):
-	mdsser = Object()
-	mdsser.ServiceAddress = Mds_IP
-	mdsser.ServicePort = Mds_Port
-	serlist = server.GetChunkServers(mdsser)
-	print serlist
-	# chksize = 10
-	# chksizes = [chksize]
-	# server.NewChunkList(chksizes)
+	# server.ListVolume()
 
-	# req = clmsg.NewVolume_Request()
-	# req.volume_name = 'testlinear'
-	# req.volume_size = 20
-	# req.chunk_size.append(20)
-	# server.NewVolume(req)
+	# chksizes = [10]
+	# chklist = server.NewChunkList(chksizes)
+	# print len(chklist)
 
+	# arg = Object()
+	# arg.type = 'striped'
+	# arg.chunksizes = []
+	# arg.subvolumes = []
+	# arg.params = ''
+	# arg.name = 'hello_softsan'
+	# arg.size = 24
+	# server.NewVolume(arg)
+
+	# print volume.size
+	server.DeleteVolume('hello_softsan')
+	
+	
 if __name__=='__main__':
-	logging.basicConfig(level=logging.DEBUG)
-
-	server=Client()
+	server = Client()
 	test(server)
-    #################### test read, write volume ###########################
-	# server.WriteVolume(5120, 'linear')
-	# print 'writevolume done'
-	# server.ReadVolume()
-     #################### test read, write volume ###########################
-
-	# MI = {}
-	# req = getattr(clmsg, 'NewVolume_Request', None)
-	# res = getattr(clmsg, 'NewVolume_Response', type(None))
-	# MI['NewVolume'] = (req, res)
-	# req = getattr(clmsg, 'DeleteVolume_Request', None)
-	# res = getattr(clmsg, 'DeleteVolume_Response', type(None))
-	# MI['DeleteVolume'] = (req, res)
-	# # print MI
-	# service=rpc.RpcService(server, MI)
-	# framework=gevent.server.StreamServer(('0.0.0.0', Client_Port), service.handler)
-	# framework.serve_forever()
