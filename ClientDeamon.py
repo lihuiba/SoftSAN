@@ -150,21 +150,6 @@ if __name__=='__main__':
 	logging.basicConfig(level=logging.DEBUG)
 
 	server=ClientDeamon()
-	# test(server)
-    #################### test read, write volume ###########################
-	# server.WriteVolume(5120, 'linear')
-	# print 'writevolume done'
-	# server.ReadVolume()
-     #################### test read, write volume ###########################
-
-	# MI = {}
-	# req = getattr(clmsg, 'NewVolume_Request', None)
-	# res = getattr(clmsg, 'NewVolume_Response', type(None))
-	# MI['NewVolume'] = (req, res)
-	# req = getattr(clmsg, 'DeleteVolume_Request', None)
-	# res = getattr(clmsg, 'DeleteVolume_Response', type(None))
-	# MI['DeleteVolume'] = (req, res)
-	# # print MI
 	service=rpc.RpcService(server)
 	framework=gevent.server.StreamServer(('0.0.0.0', Client_Port), service.handler)
 	framework.serve_forever()
