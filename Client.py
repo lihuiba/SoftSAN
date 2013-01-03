@@ -1,4 +1,4 @@
-import rpc, logging
+import rpc, logging, sys
 import messages_pb2 as msg
 import client_messages_pb2 as clmsg
 import mds, ChunkServer
@@ -7,7 +7,7 @@ import guid as Guid
 import block.dm as dm
 from mds import Object
 import libiscsi
-import scandev
+import scandev, config
 import ClientDeamon
 from util import message2object as msg2obj
 from util import object2message as obj2msg
@@ -44,16 +44,131 @@ class SocketPool:
 
 pool = SocketPool()
 
-def ParseArg():
-	ArgsDict={'create':['c',  '',       'create a volume'],
-			  'table' :['t',  sys.stdin,'volume construction table'],
-			  'remove':['rm', '',		'remove a volume'],
-			  'list'  :['l',  '',		'list object information'],
-			  'unmap' :['',   '',       'split a volume into subvolumes']
-	}
-	cfgfile = 'test.conf'
+def ParseLine(words):
+	arg = Object()
+	arg.name = ''
+	arg.size = 0
+	arg.type = ''
+	arg.chunksizes = []
+	arg.subvolumes = []
+	arg.parameters = []
+	tableFormat = 'name size <linear|striped> [sizes|volumenames]'
+
+	if isinstance(words[0], str)==False or isinstance(words[1], int)==False:
+		print tableFormat
+		return arg
+	arg.name = words[0]
+	arg.size = words[1]
+
+	if words[2] == 'striped':
+		arg.type = 'striped'
+	else:
+		arg.type = 'linear'
+
+	if isinstance(word[3], int):
+		totsize = 0
+		for i in range(3, len(words)):
+			if not isinstance(words[i], int):
+				print tableFormat
+				return arg
+			totsize += words[i]
+			arg.chunksizes.append(words[i])
+		remain = words[1]-totsize
+		if(remain < 0):
+			print 'chunk size summary is not equal to volume size'
+			return arg
+		while remain > CHUNKSIZE:
+			arg.chunksizes.append(CHUNKSIZE)
+			remain -= CHUNKSIZE
+		if remain > 0:
+			arg.chunksizes.append(remain)
+
+	if isinstance(word[3], str):
+		for i in range(3, len(words)):
+			if not isinstance(words[i], str):
+				print tableFormat
+				return arg
+			arg.subvolumes.append(words[i])
+
+	return arg
+
+def ParseArgs():
+	parser = ArgParser()
+
+	subparsers = parser.add_subparsers()
+	# create
+	parser_create = subparsers.add_parser('create', help='create a volume')
+	parser_create.add_argument('table', nargs='+', help='table to build a volume')
+	parser_create.add_argument('--file', dest='path', help='table file')
+	parser_create.set_defaults(func='Create')
+	# remove
+	parser_remove = subparsers.add_parser('remove', help='remove a volume')
+	parser_remove.add_argument('volume_name', help='volume to be removed')
+	parser_create.set_defaults(func='Remove')
+	# list
+	parser_list = subparsers.add_parser('list', help='show volume info')
+	parser_list.add_argument('volume_name', help='volume to be removed')
+	parser_create.set_defaults(func='List')
+	# split
+	parser_split = subparsers.add_parser('split', help='split a volume')
+	parser_split.add_argument('volume_name', help='volume to be removed')
+	parser_create.set_defaults(func='Split')
+	# mount
+	parser_mount = subparsers.add_parser('mount', help='mount a volume')
+	parser_mount.add_argument('volume_name', help='volume to be removed')
+	parser_create.set_defaults(func='Mount')
+	# unmount
+	parser_unmount = subparsers.add_parser('unmount', help='unmount a volume')
+	parser_unmount.add_argument('volume_name', help='volume to be removed')
+	parser_create.set_defaults(func='Unmount')
+
+	args = parser.parse_args()
+	data = None
+	if args.func == 'Create':
+		data = ParseLine(args.table)
+	getattr(client, args.func+'Volume')(data)
 
 
+# def ParseFile(path):
+# 	fp = open(path)
+# 	lines = fp.readlines()
+# 	for line in lines:
+# 		ParseLine(line)
+
+# def ParseArg(client):
+# 	ArgsDict={'create' :['c',  '',       'create a volume'],
+# 			  'table'  :['t',  sys.stdin,'volume construction table'],
+# 			  'remove' :['rm', '',		 'remove a volume'],
+# 			  'list'   :['l',  '',		 'list object information'],
+# 			  'unmap'  :['',   '',       'split a volume into subvolumes'],
+# 			  'mount'  :['',   '',       'Mount a exist volume'],
+# 			  'unmount':['',   '',		 'Unmount a volume']
+# 	}
+# 	ArgsFile = 'test.conf'
+# 	args = Object(config.config(ArgsDict, ArgsFile))
+
+# 	print args.create
+
+	# if hasattr(args, 'create'):
+	# 	print args.create
+	# 	#arg = ParseLine(args.create)
+	# 	#print arg.name, arg.size, arg.type, arg.chksizes
+	# 	#client.create(arg)
+	# if hasattr(args, 'remove'):
+	# 	name = args.remove
+	# 	client.remove(name)
+	# if hasattr(args, 'list'):
+	# 	name = args.list
+	# 	client.list(name)
+	# if hasattr(args, 'unmap'):
+	# 	name = args.unmap
+	# 	client.unmap(name)
+	# if hasattr(args, 'mount'):
+	# 	name = args.mount
+	# 	client.mount(name)
+	# if hasattr(args, 'unmount'):
+	# 	name = args.unmount
+	# 	client.unmount(name)
 
 class Client:
 
@@ -199,7 +314,7 @@ class Client:
 			return True
 		return False
 
-	def UnmapVolume(self, volumename, addr=Client_IP, port=Client_Port):
+	def SplitVolume(self, volumename, addr=Client_IP, port=Client_Port):
 		socket = pool.getConnection((addr, port))
 		stub = rpc.RpcStub(guid, socket, ClientDeamon.ClientDeamon)
 		req = msg.UnmapVolume_Request()
@@ -211,7 +326,7 @@ class Client:
 			self.WriteVolumeInfo(subvol)
 		self.DeleteVolumeInfo(volume)
 
-	def NewVolume(self, arg):
+	def CreateVolume(self, arg):
 		vollist = []
 		volume = Object()
 
@@ -222,7 +337,7 @@ class Client:
 		voltype = arg.type
 		chksizes = arg.chunksizes
 		volnames = arg.subvolumes
-		params = arg.params
+		params = arg.parameters
 
 		if len(volnames) > 0:
 			for name in volnames:
@@ -354,7 +469,7 @@ def test(server):
 	# arg.params = ''
 	# arg.name = 'hello_softsan'
 	# arg.size = 24
-	# server.NewVolume(arg)
+	# server.CreateVolume(arg)
 
 	# print volume.size
 	# server.DeleteVolume('hello_softsan')
@@ -362,4 +477,5 @@ def test(server):
 	
 if __name__=='__main__':
 	server = Client()
-	test(server)
+	#test(server)
+	ParseArg(server)
