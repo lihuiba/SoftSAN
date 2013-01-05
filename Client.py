@@ -52,18 +52,25 @@ def ParseLine(words):
 	arg.chunksizes = []
 	arg.subvolumes = []
 	arg.parameters = []
-	tableFormat = 'name size <linear|striped> [sizes|volumenames]'
+	tableFormat = 'name size [type] [num] [sizes|volumenames]'
+	num = len(words)
 
+	if num < 2:
+		return None
 	if isinstance(words[0], str)==False or isinstance(words[1], int)==False:
 		print tableFormat
-		return arg
+		return None
 	arg.name = words[0]
 	arg.size = words[1]
 
-	if words[2] == 'striped':
-		arg.type = 'striped'
-	else:
-		arg.type = 'linear'
+	if num >= 3:
+		if words[2].isdigit() == False:
+			if words[2] == 'striped' or words[2] == 'linear':
+				arg.type = words[2]
+			else
+				error = 'Unrecognized argument: ' + words[2]
+		else:
+			
 
 	if isinstance(word[3], int):
 		totsize = 0
@@ -92,19 +99,28 @@ def ParseLine(words):
 
 	return arg
 
-def ParseArgs():
-	parser = ArgParser()
+def CheckName(client, name):
+	if name == '':
+		return ''
+	if not isinstance(name, str):
+		return  'Name should be a string!'
+	if client.ReadVolumeInfo(name) == None:
+		return 'Volume ' + name + ' is not exsit!'
+	return ''
 
+def ParseArgs(client):
+	parser = ArgParser()
 	subparsers = parser.add_subparsers()
 	# create
 	parser_create = subparsers.add_parser('create', help='create a volume')
 	parser_create.add_argument('table', nargs='+', help='table to build a volume')
 	parser_create.add_argument('--file', dest='path', help='table file')
+	#parser_create.add_argument('--num', '-n', nargs='*', dest='subvolumes', help='chunk or subvolume')
 	parser_create.set_defaults(func='Create')
 	# remove
 	parser_remove = subparsers.add_parser('remove', help='remove a volume')
 	parser_remove.add_argument('volume_name', help='volume to be removed')
-	parser_create.set_defaults(func='Remove')
+	parser_create.set_defaults(func='Delete')
 	# list
 	parser_list = subparsers.add_parser('list', help='show volume info')
 	parser_list.add_argument('volume_name', help='volume to be removed')
@@ -123,9 +139,15 @@ def ParseArgs():
 	parser_create.set_defaults(func='Unmount')
 
 	args = parser.parse_args()
-	data = None
 	if args.func == 'Create':
 		data = ParseLine(args.table)
+	else:
+		data = args.volume_name
+		error = CheckName(data)
+		if not error == '':
+			print error
+			return None
+		
 	getattr(client, args.func+'Volume')(data)
 
 
@@ -294,7 +316,7 @@ class Client:
 			self.MountVolume(subvol)
 		return True
 
-	def UnmountVolume(self):
+	def UnmountVolume(self, volume):
 		if volume.assembler == 'chunk':
 			addr = volume.parameters[3]
 			port = volume.parameters[4]
@@ -440,10 +462,13 @@ class Client:
 		stub = rpc.RpcStub(guid, socket, mds.MDS)
 		req = msg.ReadVolume_Request()
 		req.fullpath = '/'+path
-		ret = stub.callMethod('ReadVolume', req)
-		volume = msg.Volume()
-		volume.ParseFromString(ret.volume)
-		return volume
+		try:
+			ret = stub.callMethod('ReadVolume', req)
+			volume = msg.Volume()
+			volume.ParseFromString(ret.volume)
+			return volume
+		except:
+			return None
 
 	def MoveVolumeInfo(self, source, dest, addr=Mds_IP, port=Mds_Port):
 		socket = pool.getConnection((addr, port))
@@ -478,4 +503,5 @@ def test(server):
 if __name__=='__main__':
 	server = Client()
 	#test(server)
-	ParseArg(server)
+	#ParseArgs(server)
+	server.ReadVolumeInfo('hello')
