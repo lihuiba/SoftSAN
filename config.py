@@ -36,7 +36,7 @@ def config(cfgdict, filename, section='test'):
 	# print 'abbrevstring:', abbrevstring
 	# print 'verbose:', verbose
 	# try:
-	opts, args = getopt.getopt(sys.argv[1:], abbrevstring, verbose)
+	opts, noOpt_args = getopt.getopt(sys.argv[1:], abbrevstring, verbose)
 	# except getopt.GetoptError, err:
 	# 	print str(err) # will print something like "option -a not recognized"
 	# 	sys.exit(2)
@@ -59,7 +59,7 @@ def config(cfgdict, filename, section='test'):
 	ret_dict = dict([key,cfgdict[key][1]] for key in cfgdict)
 	# print the usage message
 	# usage_print(cfgdict)
-	return ret_dict
+	return ret_dict, noOpt_args
 
 def usage_print(cfgdict, breadth1=5, breadth2=2, breadth3=40):
 	for key in cfgdict:
@@ -93,6 +93,8 @@ if __name__ == '__main__':
 				'CHK_PORT':['c','3456',''],\
 				'enablexxx':['x',False,'whether enable x']}
 	cfgfile = '/home/hanggao/SoftSAN/test.conf'
-	argudict = config(cfgdict, cfgfile)
+	argudict, noOpt_args = config(cfgdict, cfgfile)
+	print argudict
+	print noOpt_args
 	# for key in argudict:
 	# 	print key, '=', argudict[key],' '
