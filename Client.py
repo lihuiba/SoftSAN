@@ -12,6 +12,7 @@ import ClientDeamon
 from util import message2object as msg2obj
 from util import object2message as obj2msg
 from argparse import ArgumentParser as ArgParser
+from collections import Iterable
 
 
 Mds_IP = '192.168.0.12'
@@ -22,9 +23,6 @@ Client_Port = 6789
 CHUNKSIZE = 12
 
 LVNAME='lv_softsan_'
-
-guid=msg.Guid()
-guid.a=12; guid.b=13; guid.c=14; guid.d=15;
 
 class SocketPool:
 	def __init__(self):
@@ -41,8 +39,6 @@ class SocketPool:
 			socket = self.pool[endpoint]
 			del self.pool[endpoint]
 			socket.close
-
-pool = SocketPool()
 
 def ParseLine(words):
 	arg = Object()
@@ -192,38 +188,81 @@ def ParseArgs(client):
 	# 	name = args.unmount
 	# 	client.unmount(name)
 
-class Client:
+class MDSClient:
+	def __init__(self, guid, mdsip, mdsport):
+		socket = gevent.socket.socket()
+		socket.connect((mdsip, mdsport))
+		self.stub = rpc.RpcStub(guid, socket, mds.MDS)
+	
+	def GetChunkServers(self, count=None):
+		stub = self.getStub_MDS()
+		arg = msg.GetChunkServers_Request()
+		if count:
+			arg.randomCount = count
+		resp = stub.callMethod('GetChunkServers', arg)
+		serverlist=[message2object(x) for x in resp.random]
+		return serverlist
 
-	def GetChunkServers(self, addr, port, count = 5):
-		socket = pool.getConnection((addr, port))
-		stub = rpc.RpcStub(guid, socket, mds.MDS)
+
+class ChunkServerClient:
+	# class-level members
+	pool=SocketPool()
+	MI=rpc.BuildMethodInfo(ChunkServer.ChunkServer)
+	
+	def __init(self, csip, csport):
+		assert hasattr(ChunkServerClient, 'guid')
+		self.endpoint=(csip, csport)
+	
+	def getStub(self):
+		if hasattr(self, 'stub'):
+			return self.stub
+		socket=self.pool.getConnection(self.endpoint)
+		stub=rpc.RpcStub(guid, socket, self.MI)
+		self.stub=stub
+		return stub
+
+	def NewChunk(self, size, count = 1):
+		arg = msg.NewChunk_Request()
+		arg.size = size
+		arg.count = count
+		stub = self.getStub()
+		chunklist = stub.callMethod('NewChunk', arg)
+		return chunklist
+
+
+class Client:
+	def __init__(self, mdsip, mdsport):
+		self.guid=Guid.generate()
+		ChunkServerClient.guid=self.guid
+		self.pool=SocketPool()
+
+	def getStub_ChunkServer(self, ChunkServerIP, ChunkServerPort):
+		socket = pool.getConnection((ChunkServerIP, ChunkServerPort))
+		stub = rpc.RpcStub(self.guid, socket, self.csmi)
+		return stub
+
+	def GetChunkServers(self, count):
+		stub = self.getStub_MDS()
 		arg = msg.GetChunkServers_Request()
 		arg.randomCount = count
 		serverlist = stub.callMethod('GetChunkServers', arg)
 		return serverlist
 
-	def NewChunk(self, addr, port, size, count = 1):
-		socket = pool.getConnection((addr, port))
-		stub = rpc.RpcStub(guid, socket, ChunkServer.ChunkServer)
+	def NewChunk(self, stub, size, count = 1):
 		arg = msg.NewChunk_Request()
 		arg.size = size
 		arg.count = count
 		chunklist = stub.callMethod('NewChunk', arg)
 		return chunklist
 
-	def DeleteChunk(self, addr, port, volumes):
-		socket = pool.getConnection((addr, port))
-		stub = rpc.RpcStub(guid, socket, ChunkServer.ChunkServer)
+	def DeleteChunk(self, stub, volumes):
 		arg = msg.DeleteChunk_Request()
-		if isinstance(volumes, list) == True:
-			for volume in volumes:
-				arg.guids.add()
-				volguid = Guid.fromStr(volume.guid)
-				Guid.assign(arg.guids[-1], volguid)
-		else:
-			arg.guids.add()
-			volguid = Guid.fromStr(volumes.guid)
-			Guid.assign(arg.guids[-1], volguid)
+		if not isinstance(volumes, Iterable):
+			volumes=(volumes,)
+		for volume in volumes:
+			t=arg.guids.add()
+			volguid = Guid.fromStr(volume.guid)
+			Guid.assign(t, volguid)
 		ret = stub.callMethod('DeleteChunk', arg)
 
 	#give a list of chunk sizes, return a list of volumes
@@ -231,7 +270,7 @@ class Client:
 	def NewChunkList(self, chksizes):
 		volumelist = []
 		
-		serlist = self.GetChunkServers(Mds_IP, Mds_Port)
+		serlist = self.GetChunkServers()
 
 		for size in chksizes:
 			server = serlist.random[0]
