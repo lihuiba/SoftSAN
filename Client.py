@@ -199,8 +199,8 @@ class MDSClient:
 		arg = msg.GetChunkServers_Request()
 		if count:
 			arg.randomCount = count
-		resp = stub.callMethod('GetChunkServers', arg)
-		serverlist=[message2object(x) for x in resp.random]
+		ret = stub.callMethod('GetChunkServers', arg)
+		serverlist=[message2object(x) for x in ret.random]
 		return serverlist
 
 
@@ -209,7 +209,7 @@ class ChunkServerClient:
 	pool=SocketPool()
 	MI=rpc.BuildMethodInfo(ChunkServer.ChunkServer)
 	
-	def __init(self, csip, csport):
+	def __init__(self, csip, csport):
 		assert hasattr(ChunkServerClient, 'guid')
 		self.endpoint=(csip, csport)
 	
