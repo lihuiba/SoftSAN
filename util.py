@@ -1,3 +1,5 @@
+import logging
+
 def gethostname(mdsip):
 	'mdsip: the IP address of MDS'
 	import socket
@@ -51,6 +53,15 @@ def object2message(object, message):
 			except:
 				pass
 
+str2logginglevel={\
+	'debug'		: logging.DEBUG,\
+	'info'		: logging.INFO,\
+	'warning'	: logging.WARNING,\
+	'warn'		: logging.WARNING,\
+	'error'		: logging.ERROR,\
+	'fatal'		: logging.CRITICAL,\
+}
+
 class Pool:
 	def __init__(self, constructor, destructor=None):
 		self.pool={}
@@ -63,10 +74,10 @@ class Pool:
 		self.pool[key]=value
 		return value
 	def dispose(self):
-		for key in self.pool.keys():
-			if self.dtor:
-				self.dtor(self.pool[key])
-			del self.pool[key]
+		if self.dtor:
+			for value in self.pool.itervalues():
+				self.dtor(value)
+		self.pool.clear()
 
 def testPool():
 	class Stub:
