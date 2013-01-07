@@ -11,6 +11,7 @@ import scandev, config
 import ClientDeamon
 from util import message2object as msg2obj
 from util import object2message as obj2msg
+from util import Pool
 from argparse import ArgumentParser as ArgParser
 from collections import Iterable
 
@@ -19,178 +20,17 @@ Mds_IP = '192.168.0.12'
 Mds_Port = 1234
 Client_IP = '192.168.0.12'
 Client_Port = 6789
-
 CHUNKSIZE = 64
 
-LVNAME='lv_softsan_'
 
-class SocketPool:
-	def __init__(self):
-		self.pool = {}
-	def getConnection(self, endpoint):
-		if endpoint in self.pool:
-			return self.pool[endpoint]
-		socket = gevent.socket.socket()
-		socket.connect(endpoint)
-		self.pool[endpoint] = socket
-		return socket
-	def closeAllConnection(self):
-		for endpoint in self.pool:
-			socket = self.pool[endpoint]
-			del self.pool[endpoint]
-			socket.close
+def createSocket(endpoint):
+	socket = gevent.socket.socket()
+	socket.connect(endpoint)
+	return socket
 
-def ParseLine(words):
-	arg = Object()
-	arg.name = ''
-	arg.size = 0
-	arg.type = ''
-	arg.chunksizes = []
-	arg.subvolumes = []
-	arg.parameters = []
-	tableFormat = 'name size [type] [num] [sizes|volumenames]'
-	num = len(words)
+def closeSocket(socket):
+	socket.close()
 
-	if num < 2:
-		return None
-	if isinstance(words[0], str)==False or isinstance(words[1], int)==False:
-		print tableFormat
-		return None
-	arg.name = words[0]
-	arg.size = words[1]
-
-	if num >= 3:
-		if words[2].isdigit() == False:
-			if words[2] == 'striped':
-				arg.type = 'striped'
-			elif words[2] == 'linear':				
-				arg.type = 'linear'
-			elif words[2] == 'gfs':
-				arg.type = 'gfs'
-			else:
-				error = 'Unrecognized argument: ' + words[2]
-		#else:
-			
-
-	if isinstance(word[3], int):
-		totsize = 0
-		for i in range(3, len(words)):
-			if not isinstance(words[i], int):
-				print tableFormat
-				return arg
-			totsize += words[i]
-			arg.chunksizes.append(words[i])
-		remain = words[1]-totsize
-		if(remain < 0):
-			print 'chunk size summary is not equal to volume size'
-			return arg
-		while remain > CHUNKSIZE:
-			arg.chunksizes.append(CHUNKSIZE)
-			remain -= CHUNKSIZE
-		if remain > 0:
-			arg.chunksizes.append(remain)
-
-	if isinstance(word[3], str):
-		for i in range(3, len(words)):
-			if not isinstance(words[i], str):
-				print tableFormat
-				return arg
-			arg.subvolumes.append(words[i])
-
-	return arg
-
-def CheckName(client, name):
-	if name == '':
-		return ''
-	if not isinstance(name, str):
-		return  'Name should be a string!'
-	if client.ReadVolumeInfo(name) == None:
-		return 'Volume ' + name + ' is not exsit!'
-	return ''
-
-def ParseArgs(client):
-	parser = ArgParser()
-	subparsers = parser.add_subparsers()
-	# create
-	parser_create = subparsers.add_parser('create', help='create a volume')
-	parser_create.add_argument('table', nargs='+', help='table to build a volume')
-	parser_create.add_argument('--file', dest='path', help='table file')
-	#parser_create.add_argument('--num', '-n', nargs='*', dest='subvolumes', help='chunk or subvolume')
-	parser_create.set_defaults(func='Create')
-	# remove
-	parser_remove = subparsers.add_parser('remove', help='remove a volume')
-	parser_remove.add_argument('volume_name', help='volume to be removed')
-	parser_create.set_defaults(func='Delete')
-	# list
-	parser_list = subparsers.add_parser('list', help='show volume info')
-	parser_list.add_argument('volume_name', help='volume to be removed')
-	parser_create.set_defaults(func='List')
-	# split
-	parser_split = subparsers.add_parser('split', help='split a volume')
-	parser_split.add_argument('volume_name', help='volume to be removed')
-	parser_create.set_defaults(func='Split')
-	# mount
-	parser_mount = subparsers.add_parser('mount', help='mount a volume')
-	parser_mount.add_argument('volume_name', help='volume to be removed')
-	parser_create.set_defaults(func='Mount')
-	# unmount
-	parser_unmount = subparsers.add_parser('unmount', help='unmount a volume')
-	parser_unmount.add_argument('volume_name', help='volume to be removed')
-	parser_create.set_defaults(func='Unmount')
-
-	args = parser.parse_args()
-	if args.func == 'Create':
-		data = ParseLine(args.table)
-	else:
-		data = args.volume_name
-		error = CheckName(data)
-		if not error == '':
-			print error
-			return None
-		
-	getattr(client, args.func+'Volume')(data)
-
-
-# def ParseFile(path):
-# 	fp = open(path)
-# 	lines = fp.readlines()
-# 	for line in lines:
-# 		ParseLine(line)
-
-# def ParseArg(client):
-# 	ArgsDict={'create' :['c',  '',       'create a volume'],
-# 			  'table'  :['t',  sys.stdin,'volume construction table'],
-# 			  'remove' :['rm', '',		 'remove a volume'],
-# 			  'list'   :['l',  '',		 'list object information'],
-# 			  'unmap'  :['',   '',       'split a volume into subvolumes'],
-# 			  'mount'  :['',   '',       'Mount a exist volume'],
-# 			  'unmount':['',   '',		 'Unmount a volume']
-# 	}
-# 	ArgsFile = 'test.conf'
-# 	args = Object(config.config(ArgsDict, ArgsFile))
-
-# 	print args.create
-
-	# if hasattr(args, 'create'):
-	# 	print args.create
-	# 	#arg = ParseLine(args.create)
-	# 	#print arg.name, arg.size, arg.type, arg.chksizes
-	# 	#client.create(arg)
-	# if hasattr(args, 'remove'):
-	# 	name = args.remove
-	# 	client.remove(name)
-	# if hasattr(args, 'list'):
-	# 	name = args.list
-	# 	client.list(name)
-	# if hasattr(args, 'unmap'):
-	# 	name = args.unmap
-	# 	client.unmap(name)
-	# if hasattr(args, 'mount'):
-	# 	name = args.mount
-	# 	client.mount(name)
-	# if hasattr(args, 'unmount'):
-	# 	name = args.unmount
-	# 	client.unmount(name)
 
 class MDSClient:
 	def __init__(self, guid, mdsip, mdsport):
@@ -199,78 +39,69 @@ class MDSClient:
 		self.stub = rpc.RpcStub(guid, socket, mds.MDS)
 	
 	def GetChunkServers(self, count=None):
-		stub = self.getStub_MDS()
 		arg = msg.GetChunkServers_Request()
 		if count:
 			arg.randomCount = count
-		ret = stub.callMethod('GetChunkServers', arg)
-		serverlist=[message2object(x) for x in ret.random]
+		ret = self.stub.callMethod('GetChunkServers', arg)
+		serverlist=[msg2obj(x) for x in ret.random]
 		return serverlist
 
-	def WriteVolumeInfo(self, volume, addr=Mds_IP, port=Mds_Port):
-		if isinstance(volume, str) == True:
+	def WriteVolumeInfo(self, volume):
+		if isinstance(volume, str):
 			path = volume
 		else:
 			path = volume.parameters[0]
-		socket = pool.getConnection((addr, port))
-		stub = rpc.RpcStub(guid, socket, mds.MDS)
 		req = msg.WriteVolume_Request()
 		req.volume = volume.SerializeToString()
 		req.fullpath = '/'+path
-		ret = stub.callMethod('WriteVolume', req)
+		ret = self.stub.callMethod('WriteVolume', req)
 
-	def DeleteVolumeInfo(self, volume, addr=Mds_IP, port=Mds_Port):
-		if isinstance(volume, str) == True:
+	def DeleteVolumeInfo(self, volume):
+		if isinstance(volume, str):
 			path = volume
 		else:
 			path = volume.parameters[0]
-		socket = pool.getConnection((addr, port))
-		stub = rpc.RpcStub(guid, socket, mds.MDS)
 		req = msg.DeleteVolume_Request()
 		req.fullpath = '/'+path
-		ret = stub.callMethod('DeleteVolume', req)
+		ret = self.stub.callMethod('DeleteVolume', req)
 
-	def ReadVolumeInfo(self, name, addr=Mds_IP, port=Mds_Port):
-		if isinstance(name, str) == True:
+	def ReadVolumeInfo(self, name):
+		if isinstance(name, str):
 			path = name
 		else:
 			path = Guid.toStr(name)
-		socket = pool.getConnection((addr, port))
-		stub = rpc.RpcStub(guid, socket, mds.MDS)
 		req = msg.ReadVolume_Request()
 		req.fullpath = '/'+path
 		try:
-			ret = stub.callMethod('ReadVolume', req)
+			ret = self.stub.callMethod('ReadVolume', req)
 			volume = msg.Volume()
 			volume.ParseFromString(ret.volume)
-			return volume
+			return msg2obj(volume)
 		except:
 			return None
 
-	def MoveVolumeInfo(self, source, dest, addr=Mds_IP, port=Mds_Port):
-		socket = pool.getConnection((addr, port))
-		stub = rpc.RpcStub(guid, socket, mds.MDS)
+	def MoveVolumeInfo(self, source, dest):
 		req = msg.MoveVolume_Request()
 		req.source = source
 		req.destination = dest
-		ret = stub.callMethod('MoveVolume', req)
-
+		ret = self.stub.callMethod('MoveVolume', req)
 
 
 class ChunkServerClient:
 	# class-level members
-	pool=SocketPool()
+	pool = Pool(createSocket, closeSocket)
 	MI=rpc.BuildMethodInfo(ChunkServer.ChunkServer)
 	
-	def __init__(self, csip, csport):
-		assert hasattr(ChunkServerClient, 'guid')
+	def __init__(self, guid, csip, csport):
+		#assert hasattr(ChunkServerClient, 'guid')
+		self.guid = guid
 		self.endpoint=(csip, csport)
 	
 	def getStub(self):
 		if hasattr(self, 'stub'):
 			return self.stub
-		socket=self.pool.getConnection(self.endpoint)
-		stub=rpc.RpcStub(guid, socket, self.MI)
+		socket=self.pool.get(self.endpoint)
+		stub=rpc.RpcStub(self.guid, socket, ChunkServer.ChunkServer)
 		self.stub=stub
 		return stub
 
@@ -282,83 +113,71 @@ class ChunkServerClient:
 		chunklist = stub.callMethod('NewChunk', arg)
 		return chunklist
 
-	def NewChunk(self, stub, size, count = 1):
-		arg = msg.NewChunk_Request()
-		arg.size = size
-		arg.count = count
-		chunklist = stub.callMethod('NewChunk', arg)
-		return chunklist
-
-	def DeleteChunk(self, stub, volumes):
+	def DeleteChunk(self, volumes):
+		stub = self.getStub()
 		arg = msg.DeleteChunk_Request()
-		if not isinstance(volumes, Iterable):
-			volumes=(volumes,)
+		if not isinstance(volumes, list):
+			volumes = [volumes]
 		for volume in volumes:
-			t=arg.guids.add()
+			t = arg.guids.add()
 			volguid = Guid.fromStr(volume.guid)
 			Guid.assign(t, volguid)
 		ret = stub.callMethod('DeleteChunk', arg)
 
-	def AssembleChunk(self, addr, port, volume):
-		socket = pool.getConnection((addr, port))
-		stub = rpc.RpcStub(guid, socket, ChunkServer.ChunkServer)
+	def AssembleChunk(self, volume):
+		stub = self.getStub()
 		req = msg.AssembleVolume_Request()
 		obj2msg(volume, req.volume)
 		target = stub.callMethod('AssembleVolume', req)
 		return target
 
-	def DisassembleChunk(self, addr, port, nodename):
-		socket = pool.getConnection((addr, port))
-		stub = rpc.RpcStub(guid, socket, ChunkServer.ChunkServer)
+	def DisassembleChunk(self, nodename):
+		stub = self.getStub()
 		req = msg.DisassembleVolume_Request()
 		req.access_point = nodename
 		ret = stub.callMethod('DisassembleVolume', req)
 
+	def Clear():
+		self.pool.dispose()
+
 
 class Client:
 	def __init__(self, mdsip, mdsport):
-		self.guid=Guid.generate()
-		ChunkServerClient.guid=self.guid
-		self.pool=SocketPool()
+		self.guid = Guid.generate()
+		self.pool = Pool(ChunkServerClient)
+		self.mds = MDSClient(self.guid, mdsip, mdsport)
+		socket = gevent.socket.socket()
+		socket.connect((Client_IP, Client_Port))
+		self.stub = rpc.RpcStub(self.guid, socket, ClientDeamon.ClientDeamon)
 
-	def getStub_ChunkServer(self, ChunkServerIP, ChunkServerPort):
-		socket = pool.getConnection((ChunkServerIP, ChunkServerPort))
-		stub = rpc.RpcStub(self.guid, socket, self.csmi)
-		return stub
-
-	def GetChunkServers(self, count):
-		stub = self.getStub_MDS()
-		arg = msg.GetChunkServers_Request()
-		arg.randomCount = count
-		serverlist = stub.callMethod('GetChunkServers', arg)
-		return serverlist
-
-	#give a list of chunk sizes, return a list of volumes
-    #volume : path node msg.volume
+	# give a list of chunk sizes, return a list of volumes
+    # volume : path node msg.volume
 	def NewChunkList(self, chksizes):
 		volumelist = []
 		
-		serlist = self.GetChunkServers()
+		serlist = self.mds.GetChunkServers()
 
 		for size in chksizes:
-			server = serlist.random[0]
+			server = serlist[0]
 			addr = server.ServiceAddress
 			port = server.ServicePort
-			chunks = self.NewChunk(addr, port, size, 1)
+			chkclient = self.pool.get(self.guid, addr, port)
+			chunks = chkclient.NewChunk(size, 1)
 			if chunks == []:
 				pass
 			
-			print 'chunksize: ', size
 			volume = Object()
 			volume.size = size
 			volume.assembler = 'chunk'
 			volume.guid = Guid.toStr(chunks.guids[0])
-			path, nodename = self.MountChunk(addr, port, volume)
-			volume.parameters = [volume.guid, path, nodename,
-			server.ServiceAddress, server.ServicePort]
-
+			volume.parameters = [volume.guid, '', '', addr, str(port)]
+			path, nodename = self.MountChunk(volume)
+			volume.parameters[1] = path
+			volume.parameters[2] = nodename
+			
 			if path == None:
-				self.UnmountChunk(volumelist)
+				for volume in volumelist:
+					self.UnmountChunk(volume)
 				print 'Could not mount chunk'
 				return None
 
@@ -372,8 +191,11 @@ class Client:
 				return node
 		return None
 
-	def MountChunk(self, addr, port, volume):
-		target = self.AssembleChunk(addr, port, volume)
+	def MountChunk(self, volume):
+		addr = volume.parameters[3]
+		port = int(volume.parameters[4])
+		chkclient = self.pool.get(self.guid, addr, port)
+		target = chkclient.AssembleChunk(volume)
 		node = self.GetChunkNode(target.access_point, addr)
 		if not node == None:
 			node.login()
@@ -382,27 +204,21 @@ class Client:
 				return dev, node.name
 		return None, None
 
-	def UnmountChunk(self, volumes):
-		print 'removing chunks......'
-		if not isinstance(volumes, list):
-			volumes = [volumes]
+	def UnmountChunk(self, volume):
 		errorinfo = []#record error information
-		for volume in volumes:
-			addr = volume.parameters[3]
-			port = int(volume.parameters[4])
-			nodename = volume.parameters[2]
-			print 'nodename: ', nodename
-			node = self.GetChunkNode(nodename, addr)
-			if not node == None:
-				node.logout()
-			self.DisassembleChunk(addr, port, nodename)
+		addr = volume.parameters[3]
+		port = int(volume.parameters[4])
+		nodename = volume.parameters[2]
+		node = self.GetChunkNode(nodename, addr)
+		if node != None:
+			node.logout()
+		chkclient = self.pool.get(self.guid, addr, port)
+		chkclient.DisassembleChunk(nodename)
 		return errorinfo
 		
 	def MountVolume(self, volume):
 		if volume.assembler == 'chunk':
-			addr = volume.parameters[3]
-			port = volume.parameters[4]
-			self.MountChunk(addr, port, voluem)
+			self.MountChunk(volume)
 			return True
 		for subvol in volume.subvolumes:
 			self.MountVolume(subvol)
@@ -411,64 +227,59 @@ class Client:
 	def UnmountVolume(self, volume):
 		if volume.assembler == 'chunk':
 			addr = volume.parameters[3]
-			port = volume.parameters[4]
-			self.UnmountChunk(addr, port, voluem)
+			port = int(volume.parameters[4])
+			chkclient = self.pool.get(self.guid, addr, port)
+			if chkclient.UnmountChunk(volume) == False:
+				return False
 			return True
 		for subvol in volume.subvolumes:
 			self.UnmountVolume(subvol)
 		return True
 
-	def MapVolume(self, volume, addr=Client_IP, port=Client_Port):
-		socket = pool.getConnection((addr, port))
-		stub = rpc.RpcStub(guid, socket, ClientDeamon.ClientDeamon)
+	def MapVolume(self, volume):
 		req = msg.MapVolume_Request()
 		obj2msg(volume, req.volume)
-		ret = stub.callMethod('MapVolume', req)
+		ret = self.stub.callMethod('MapVolume', req)
 		if ret.error == '':
 			return True
 		return False
 
-	def SplitVolume(self, volumename, addr=Client_IP, port=Client_Port):
-		socket = pool.getConnection((addr, port))
-		stub = rpc.RpcStub(guid, socket, ClientDeamon.ClientDeamon)
-		req = msg.UnmapVolume_Request()
+	def SplitVolume(self, volumename):
+		req = msg.SplitVolume_Request()
 		req.name = volumename
-		ret = stub.callMethod('UnmapVolume', req)
+		ret = self.stub.callMethod('SplitVolume', req)
 
-		volume = self.ReadVolumeInfo(volumename)
-		for subvol in volume.subvolumes:
-			self.WriteVolumeInfo(subvol)
-		self.DeleteVolumeInfo(volume)
+		volume = self.mds.ReadVolumeInfo(volumename)
+		self.mds.DeleteVolumeInfo(volume)
 
 	def CreateVolume(self, arg):
 		vollist = []
 		volume = Object()
 
 		volname = arg.name
-		if volname in VolumeDict:
-			print 'volume name has been used! find another one'
 		volsize = arg.size
 		voltype = arg.type
 		chksizes = arg.chunksizes
 		volnames = arg.subvolumes
 		params = arg.parameters
 
+		if voltype == '':
+			voltype = 'linear'
+
 		if len(volnames) > 0:
 			for name in volnames:
-				ret = self.ReadVolumeInfo(name)
-				vol = msg2obj(ret)
+				vol = self.mds.ReadVolumeInfo(name)
 				if vol == None:
 					pass
 				vollist.append(vol)
 		
-		if voltype == '':
-			voltype = 'linear'
 		if len(chksizes) == 0 and len(volnames) == 0:
 			totsize = volsize
 			while totsize > CHUNKSIZE:
 				chksizes.append(CHUNKSIZE)
 				totsize -= CHUNKSIZE
 			chksizes.append(totsize)
+
 		if voltype == 'gfs':
 			temlist = []
 			for chksize in chksizes:
@@ -480,12 +291,13 @@ class Client:
 		if len(chksizes) > 0:
 			vollist = self.NewChunkList(chksizes)
 			if vollist == None:
+				print 'New Chunk failed'
 				pass
 			for vol in vollist:
 				print 'vol.size: ', vol.size
 				msgvol = msg.Volume()
 				obj2msg(vol, msgvol)
-				self.WriteVolumeInfo(msgvol)
+				self.mds.WriteVolumeInfo(msgvol)
 
 		volume.size = volsize
 		volume.assembler = voltype
@@ -495,26 +307,29 @@ class Client:
 		volume.parameters.extend(params)
 		ret = self.MapVolume(volume)
 		if ret == None:
-			self.UnmountChunk(vollist)
+			for vol in vollist:
+				self.UnmountChunk(vol)
 			pass
 		msgvolume = msg.Volume()
 		obj2msg(volume, msgvolume)
-		self.WriteVolumeInfo(msgvolume)
+		self.mds.WriteVolumeInfo(msgvolume)
  
 	def DeleteVolume(self, name):
 		self.DeleteVolumeTree(name)
-		self.DeleteVolumeInfo(name)
-		socket = pool.getConnection((addr, port))
-		stub = rpc.RpcStub(guid, socket, ClientDeamon.ClientDeamon)
+		self.mds.DeleteVolumeInfo(name)
 		req = msg.ClientDeleteVolume_Request()
 		req.name = name
-		ret = stub.callMethod('ClientDeleteVolume', req)
+		ret = self.stub.callMethod('ClientDeleteVolume', req)
 
 	def DeleteVolumeTree(self, volume):
 		if isinstance(volume, str):
-			volume = self.ReadVolumeInfo(volume)
+			volume = self.mds.ReadVolumeInfo(volume)
 		if volume.assembler == 'chunk':
+			addr = volume.parameters[3]
+			port = int(volume.parameters[4])
+			chkclient = self.pool.get(self.guid, addr, port)
 			self.UnmountChunk(volume)
+			chkclient.DeleteChunk(volume)
 			return True
 		mps = dm.maps()
 		name = volume.parameters[0]
@@ -524,35 +339,64 @@ class Client:
 		for subvolume in volume.subvolumes:
 			self.DeleteVolumeTree(subvolume)
 
-	def ListVolume(self):
-		maplist = dm.maps()
-		for mp in maplist:
-			print mp.name
+	def ListVolume(self, name):
+		volume = self.mds.ReadVolumeInfo(name)
+		print volume.parameters[0]
+		print volume.size
 
-def test(server):
-	serlist = server.GetChunkServers(Mds_IP, Mds_Port)
-	print serlist
-	# server.ListVolume()
+	def RestoreVolumeInfo(self):
+		mplist = dm.maps()
+		for mp in mplist:
+			volume = self.mds.ReadVolumeInfo(mp.name)
+			if volume != None:
+				req = msg.ClientWriteVolume_Request()
+				obj2msg(volume, req.volume)
+				self.stub.callMethod('ClientWriteVolume', req)
 
-	# chksizes = [10]
-	# chklist = server.NewChunkList(chksizes)
-	# print len(chklist)
+
+def test():
+	client = Client(Mds_IP, Mds_Port)
+	# arg = Object()
+	# arg.type = 'linear'
+	# arg.chunksizes = []
+	# arg.subvolumes = []
+	# arg.parameters = []
+	# arg.name = 'hello_softsan_1'
+	# arg.size = 100
+	# client.CreateVolume(arg)
+
+	# arg = Object()
+	# arg.type = 'linear'
+	# arg.chunksizes = []
+	# arg.subvolumes = []
+	# arg.parameters = []
+	# arg.name = 'hello_softsan_2'
+	# arg.size = 100
+	# client.CreateVolume(arg)
 
 	# arg = Object()
 	# arg.type = 'striped'
 	# arg.chunksizes = []
-	# arg.subvolumes = []
-	# arg.params = ''
-	# arg.name = 'hello_softsan'
-	# arg.size = 24
-	# server.CreateVolume(arg)
+	# arg.subvolumes = ['hello_softsan_1', 'hello_softsan_2']
+	# arg.parameters = []
+	# arg.name = 'hello_softsan_3'
+	# arg.size = 200
+	# client.CreateVolume(arg)
+	# # client.DeleteVolume('hello_softsan_1')
+	# # client.DeleteVolume('hello_softsan_2')
+	# client.DeleteVolume('hello_softsan_3')
 
-	# print volume.size
-	# server.DeleteVolume('hello_softsan')
+	# arg = Object()
+	# arg.type = 'gfs'
+	# arg.chunksizes = []
+	# arg.subvolumes = []
+	# arg.parameters = []
+	# arg.name = 'gfs'
+	# arg.size = 80
+	# client.CreateVolume(arg)
+
+	client.DeleteVolume('gfs')
 	
 	
 if __name__=='__main__':
-	server = Client()
-	#test(server)
-	#ParseArgs(server)
-	server.ReadVolumeInfo('hello')
+	test()

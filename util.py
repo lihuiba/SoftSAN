@@ -34,6 +34,7 @@ def message2object(message):
 	return rst
 
 def object2message(object, message):
+	import guid as Guid, messages_pb2 as msg
 	d = object if isinstance(object, dict) else object.__dict__
 	for key in d:
 		if key.startswith('_'):
@@ -47,8 +48,13 @@ def object2message(object, message):
 				appender(item)
 		else:
 			try:
-				setattr(message, key, value)
+				if key == 'guid':
+					value=Guid.fromStr(value)
+					Guid.assign(message.guid, value)
+				else:
+					setattr(message, key, value)
 			except:
+				print 'exception occured'
 				pass
 
 class Pool:
