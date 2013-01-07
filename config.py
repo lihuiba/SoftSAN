@@ -64,7 +64,8 @@ def config(cfgdict, filename, section='test'):
 def usage_print(cfgdict, breadth1=5, breadth2=2, breadth3=40):
 	for key in cfgdict:
 		print ('  --'+key+',').ljust(breadth1,' ',),' ','-'+cfgdict[key][0].ljust(breadth2,' ',)
-		indent_print(cfgdict[key][2], breadth3,breadth1+breadth2+10)
+		longstr=cfgdict[key][2]+" (default: {0})".format(cfgdict[key][1])
+		indent_print(longstr, breadth3,breadth1+breadth2+10)
 		
 def indent_print(longstr,  breadth=30, indent=25):
 	longstr = string.replace(longstr,'\n',' ')
