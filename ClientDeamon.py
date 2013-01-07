@@ -64,6 +64,23 @@ class ClientDeamon:
 		tblist.append(table)
 		dm.map(volumename, tblist)
 
+	def MapGFSVolume(self, name, size, devlist):
+		tblist = []
+		start = 0
+		num = len(devlist)
+		i = 0
+		while i < num:
+			params = 'core 2 64 nosync 3'
+			params += ' '+devlist[i].parameters[1]+' 0'
+			params += ' '+devlist[i+1].parameters[1]+' 0'
+			params += ' '+devlist[i+2].parameters[1]+' 0'
+			size = devlist[i].size*2048
+			table = dm.table(start, size, 'mirror', params)
+			tblist.append(table)
+			start += size
+			i += 3
+		dm.map(volumename, tablist)
+
 	def MapVolume(self, req):
 		volumename = req.volume.parameters[0]
 		size = req.volume.size
@@ -78,6 +95,8 @@ class ClientDeamon:
 			else:
 				stripedsize = 256
 			self.MapStripedVolume(volumename, stripedsize, req.volume.subvolumes)
+		elif dmtype == 'gfs':
+			self.MapGFSVolume(volumename, size, req.volume.subvolumes)
 
 		VolumeDict[volumename] = req.volume
 
@@ -150,21 +169,6 @@ if __name__=='__main__':
 	logging.basicConfig(level=logging.DEBUG)
 
 	server=ClientDeamon()
-	# test(server)
-    #################### test read, write volume ###########################
-	# server.WriteVolume(5120, 'linear')
-	# print 'writevolume done'
-	# server.ReadVolume()
-     #################### test read, write volume ###########################
-
-	# MI = {}
-	# req = getattr(clmsg, 'NewVolume_Request', None)
-	# res = getattr(clmsg, 'NewVolume_Response', type(None))
-	# MI['NewVolume'] = (req, res)
-	# req = getattr(clmsg, 'DeleteVolume_Request', None)
-	# res = getattr(clmsg, 'DeleteVolume_Response', type(None))
-	# MI['DeleteVolume'] = (req, res)
-	# # print MI
 	service=rpc.RpcService(server)
 	framework=gevent.server.StreamServer(('0.0.0.0', Client_Port), service.handler)
 	framework.serve_forever()

@@ -1,3 +1,5 @@
+import logging
+
 def gethostname(mdsip):
 	'mdsip: the IP address of MDS'
 	import socket
@@ -35,7 +37,7 @@ def message2object(message):
 
 def object2message(object, message):
 	d = object if isinstance(object, dict) else object.__dict__
-	for key in d.keys():
+	for key in d:
 		if key.startswith('_'):
 			continue
 		value=d[key]
@@ -43,15 +45,66 @@ def object2message(object, message):
 			mfield=getattr(message, key)
 			appender = (lambda x : mfield.append(x)) if hasattr(mfield, 'append') \
 				  else (lambda x : object2message(x, mfield.add()))
-			print value
 			for item in value:
 				appender(item)
-				print item
 		else:
 			try:
 				setattr(message, key, value)
 			except:
 				pass
 
+str2logginglevel={\
+	'debug'		: logging.DEBUG,\
+	'info'		: logging.INFO,\
+	'warning'	: logging.WARNING,\
+	'warn'		: logging.WARNING,\
+	'error'		: logging.ERROR,\
+	'fatal'		: logging.CRITICAL,\
+}
+
+class Pool:
+	def __init__(self, constructor, destructor=None):
+		self.pool={}
+		self.ctor=constructor
+		self.dtor=destructor
+	def get(self, *key):
+		if key in self.pool:
+			return self.pool[key]
+		value=self.ctor(*key)
+		self.pool[key]=value
+		return value
+	def dispose(self):
+		if self.dtor:
+			for value in self.pool.itervalues():
+				self.dtor(value)
+		self.pool.clear()
+
+def testPool():
+	class Stub:
+		def __init__(self,a,b,c,d):
+			self.key=(a,b,c,d)
+			print 'constructing stub', self.key
+		def close(self):
+			print 'destructing stub', self.key
+	pool=Pool(Stub)
+	pool.get(10,20,3,2)
+	pool.get(32,1.2312,56,32)
+	pool.get('asdf', 'jkl;', 32, 3.13)
+	pool.dispose()	
+
+	class Socket:
+		def __init__(self,endpoint):
+			self.key=endpoint
+			print 'constructing socket', self.key
+		def close(self):
+			print 'destructing socket', self.key
+	pool=Pool(lambda *args : Socket(args), Socket.close)
+	pool.get(10,20)
+	pool.get(32,1.2312)
+	pool.get('asdf', 'jkl;')
+	pool.dispose()
+
+
 if __name__ == '__main__':
-	print gethostname('localhost.localdomain')
+	#print gethostname('localhost.localdomain')
+	testPool()
