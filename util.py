@@ -52,7 +52,7 @@ def object2message(object, message):
 				pass
 
 class Pool:
-	def __init__(self, constructor, destructor):
+	def __init__(self, constructor, destructor=None):
 		self.pool={}
 		self.ctor=constructor
 		self.dtor=destructor
@@ -64,17 +64,18 @@ class Pool:
 		return value
 	def dispose(self):
 		for key in self.pool.keys():
-			self.dtor(self.pool[key])
+			if self.dtor:
+				self.dtor(self.pool[key])
 			del self.pool[key]
 
 def testPool():
 	class Stub:
 		def __init__(self,a,b,c,d):
 			self.key=(a,b,c,d)
-			print 'constructing ', self.key
+			print 'constructing stub', self.key
 		def close(self):
-			print 'destructing ', self.key
-	pool=Pool(Stub, Stub.close)
+			print 'destructing stub', self.key
+	pool=Pool(Stub)
 	pool.get(10,20,3,2)
 	pool.get(32,1.2312,56,32)
 	pool.get('asdf', 'jkl;', 32, 3.13)
@@ -83,9 +84,9 @@ def testPool():
 	class Socket:
 		def __init__(self,endpoint):
 			self.key=endpoint
-			print 'constructing ', self.key
+			print 'constructing socket', self.key
 		def close(self):
-			print 'destructing ', self.key
+			print 'destructing socket', self.key
 	pool=Pool(lambda *args : Socket(args), Socket.close)
 	pool.get(10,20)
 	pool.get(32,1.2312)
