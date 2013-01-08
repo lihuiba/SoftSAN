@@ -12,7 +12,6 @@ import ClientDeamon
 from util import message2object as msg2obj
 from util import object2message as obj2msg
 from util import Pool
-from argparse import ArgumentParser as ArgParser
 from collections import Iterable
 
 
@@ -242,6 +241,7 @@ class Client:
 		ret = self.stub.callMethod('MapVolume', req)
 		if ret.error == '':
 			return True
+		print ret.error
 		return False
 
 	def SplitVolume(self, volumename):
@@ -263,9 +263,6 @@ class Client:
 		volnames = arg.subvolumes
 		params = arg.parameters
 
-		if voltype == '':
-			voltype = 'linear'
-
 		if len(volnames) > 0:
 			for name in volnames:
 				vol = self.mds.ReadVolumeInfo(name)
@@ -279,6 +276,9 @@ class Client:
 				chksizes.append(CHUNKSIZE)
 				totsize -= CHUNKSIZE
 			chksizes.append(totsize)
+
+		if voltype == '':
+			voltype = 'linear'
 
 		if voltype == 'gfs':
 			temlist = []
@@ -305,18 +305,23 @@ class Client:
 		volume.guid = Guid.toStr(Guid.generate())
 		volume.parameters = [volname, '/dev/mapper/'+volname]
 		volume.parameters.extend(params)
+
 		ret = self.MapVolume(volume)
-		if ret == None:
-			for vol in vollist:
-				self.UnmountChunk(vol)
-			pass
+		if ret == False:
+			if volume.subvolumes[0].assembler == 'chunk':
+				for subvol in volume.subvolumes:
+					self.DeleteVolumeTree(subvol)
+			return False
+
 		msgvolume = msg.Volume()
 		obj2msg(volume, msgvolume)
 		self.mds.WriteVolumeInfo(msgvolume)
+		return True
  
 	def DeleteVolume(self, name):
+		if isinstance(name, Object):
+			name = name.parameters[0]
 		self.DeleteVolumeTree(name)
-		self.mds.DeleteVolumeInfo(name)
 		req = msg.ClientDeleteVolume_Request()
 		req.name = name
 		ret = self.stub.callMethod('ClientDeleteVolume', req)
@@ -324,6 +329,7 @@ class Client:
 	def DeleteVolumeTree(self, volume):
 		if isinstance(volume, str):
 			volume = self.mds.ReadVolumeInfo(volume)
+		self.mds.DeleteVolumeInfo(volume)
 		if volume.assembler == 'chunk':
 			addr = volume.parameters[3]
 			port = int(volume.parameters[4])
@@ -356,6 +362,16 @@ class Client:
 
 def test():
 	client = Client(Mds_IP, Mds_Port)
+
+	arg = Object()
+	arg.type = 'striped'
+	arg.chunksizes = []
+	arg.subvolumes = []
+	arg.parameters = []
+	arg.name = 'hello_softsan_striped'
+	arg.size = 128
+	client.CreateVolume(arg)
+
 	# arg = Object()
 	# arg.type = 'linear'
 	# arg.chunksizes = []
@@ -395,8 +411,7 @@ def test():
 	# arg.size = 80
 	# client.CreateVolume(arg)
 
-	client.DeleteVolume('gfs')
-	
+	#client.DeleteVolume('gfs')
 	
 if __name__=='__main__':
 	test()
