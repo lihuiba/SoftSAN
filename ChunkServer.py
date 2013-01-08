@@ -162,12 +162,14 @@ if __name__=='__main__':
 				'enablexxx':['x',False,'whether enable x']}
 
 	cfgfile = '/home/hanggao/SoftSAN/test.conf'
-	configure = config.config(cfgdict, cfgfile)
+	configure,_ = config.config(cfgdict, cfgfile)
 	PARAM = util.Object(configure)
-	server=ChunkServer()
-	logging.basicConfig(level=logging.DEBUG)	
-	gevent.spawn(heartBeat, server)
-	service=rpc.RpcService(server)
-	framework=gevent.server.StreamServer(('0.0.0.0',int(PARAM.CHK_PORT)), service.handler)
-	framework.serve_forever()
+	print PARAM.MDS_IP
+	print configure
+	# server=ChunkServer()
+	# logging.basicConfig(level=logging.DEBUG)	
+	# gevent.spawn(heartBeat, server)
+	# service=rpc.RpcService(server)
+	# framework=gevent.server.StreamServer(('0.0.0.0',int(PARAM.CHK_PORT)), service.handler)
+	# framework.serve_forever()
 	

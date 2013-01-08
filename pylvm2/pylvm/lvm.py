@@ -63,7 +63,7 @@ class LVM:
 			logging.info(output)
 			return None
 		return "Invalid Size!"
-
+	
 	def remove_lv(self, lv):
 		argv = list()
 		argv.append(LVREMOVE_BIN_PATH)

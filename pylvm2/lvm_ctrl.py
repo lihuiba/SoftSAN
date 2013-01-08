@@ -117,6 +117,13 @@ class LVM2(LVM):
 			logging.info(output)
 			return None
 		return "Invalid Size!"
+
+	# lvcreate -L 100G -T VolGroup/thinpool
+
+	# lvcreate -V 10G -T VolGroup/thinpool -n thinvol0
+
+	def thin_lv_create(self, vgname, lvname, size):
+		pass
 		
 
 	def lv_extend(self, lvpath, alter_size):
@@ -171,6 +178,9 @@ class LVM2(LVM):
 		return False
 	
 
+	# lvextend -L +1G VolGroup/thinpool
+
+	# lvextend -L +10G /dev/VolGroup/thinvol0
 
 		
 
