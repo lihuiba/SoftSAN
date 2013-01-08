@@ -26,7 +26,11 @@ class ClientDeamon:
 			table = dm.table(start, size, 'linear', params)
 			tblist.append(table)
 			start += size
-		dm.map(volumename, tblist)
+		try:
+			dm.map(volumename, tblist)
+		except:
+			return False
+		return True
 
 	def MapStripedVolume(self, volumename, strsize, devlist):
 		tblist = []
@@ -39,9 +43,13 @@ class ClientDeamon:
 		print params
 		table = dm.table(start, size, 'striped', params)
 		tblist.append(table)
-		dm.map(volumename, tblist)
+		try:
+			dm.map(volumename, tblist)
+		except:
+			return False
+		return True
 
-	def MapGFSVolume(self, name, size, devlist):
+	def MapGFSVolume(self, volumename, devlist):
 		tblist = []
 		start = 0
 		num = len(devlist)
@@ -56,7 +64,11 @@ class ClientDeamon:
 			tblist.append(table)
 			start += size
 			i += 3
-		dm.map(name, tblist)
+		try:
+			dm.map(volumename, tblist)
+		except:
+			return False
+		return True
 
 	def MapVolume(self, req):
 		volumename = req.volume.parameters[0]
@@ -64,20 +76,22 @@ class ClientDeamon:
 		dmtype = req.volume.assembler
 
 		if dmtype == 'linear':
-			self.MapLinearVolume(volumename, req.volume.subvolumes)
+			result = self.MapLinearVolume(volumename, req.volume.subvolumes)
 		elif dmtype == 'striped':
 			if len(req.volume.parameters) > 2:
-				param = req.volume.parameters[2]
 				stripedsize = int(req.volume.parameters[2])
 			else:
 				stripedsize = 256
-			self.MapStripedVolume(volumename, stripedsize, req.volume.subvolumes)
+			result = self.MapStripedVolume(volumename, stripedsize, req.volume.subvolumes)
 		elif dmtype == 'gfs':
-			self.MapGFSVolume(volumename, size, req.volume.subvolumes)
-
-		VolumeDict[volumename] = req.volume
+			result = self.MapGFSVolume(volumename, req.volume.subvolumes)
 
 		ret = msg.MapVolume_Response()
+		if result == False:
+			ret.error = 'device mapper: Mapping volume failed'
+			return ret
+
+		VolumeDict[volumename] = req.volume
 		ret.error = ''
 		return ret
 
