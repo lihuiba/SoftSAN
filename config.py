@@ -61,8 +61,6 @@ def config(cfgdict):
 	# print 'get value from command:'.ljust(20,' '), cfgdict
 	ret_dict = dict([key,cfgdict[key][1]] for key in cfgdict)
 	# print the usage message
-	
-
 	return ret_dict, noOpt_args
 
 def usage_print(cfgdict, breadth1=5, breadth2=2, breadth3=50):

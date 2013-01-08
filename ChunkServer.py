@@ -155,21 +155,23 @@ if __name__=='__main__':
 				augment with a --sort option, but any
 				use of --sort=none (-U) disables grouping
 			  '''
+	cfgfile = '/home/hanggao/SoftSAN/test.conf'
 	cfgdict = {'MDS_IP':['M','192.168.0.12','ip address of metadata server'], \
 				'MDS_PORT':['m','1234','port of metadata server'], \
 				'CHK_IP':['C','192.168.0.12',longstr], \
 				'CHK_PORT':['c','4321',''],\
-				'enablexxx':['x',False,'whether enable x']}
+				'enablexxx':['x',False,'whether enable x'],\
+				'cfgfile':['f', cfgfile, 'configuation file of SoftSAN']
+				}
 
-	cfgfile = '/home/hanggao/SoftSAN/test.conf'
-	configure,_ = config.config(cfgdict, cfgfile)
+	configure,_ = config.config(cfgdict)
 	PARAM = util.Object(configure)
-	print PARAM.MDS_IP
-	print configure
-	# server=ChunkServer()
-	# logging.basicConfig(level=logging.DEBUG)	
-	# gevent.spawn(heartBeat, server)
-	# service=rpc.RpcService(server)
-	# framework=gevent.server.StreamServer(('0.0.0.0',int(PARAM.CHK_PORT)), service.handler)
-	# framework.serve_forever()
+	# print PARAM.MDS_IP
+	# print configure
+	server=ChunkServer()
+	logging.basicConfig(level=logging.DEBUG)	
+	gevent.spawn(heartBeat, server)
+	service=rpc.RpcService(server)
+	framework=gevent.server.StreamServer(('0.0.0.0',int(PARAM.CHK_PORT)), service.handler)
+	framework.serve_forever()
 	
