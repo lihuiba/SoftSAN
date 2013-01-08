@@ -1,6 +1,5 @@
 import rpc, logging
 import messages_pb2 as msg
-import client_messages_pb2 as clmsg
 import mds, ChunkServer
 import gevent.socket
 import guid as Guid
@@ -11,34 +10,12 @@ import scandev
 
 Client_IP = '192.168.0.12'
 Mds_IP = '192.168.0.12'
-
 Client_Port = 6789
 Mds_Port = 1234
 
-
 VolumeDict = {}
 
-guid=msg.Guid()
-guid.a=12; guid.b=13; guid.c=14; guid.d=15;
-	
 class ClientDeamon:
-	
-	def AssembleVolume(strategy, volumename = ''):
-		tablist = []
-		start = 0
-		for segment in strategy:
-			size = segment.size
-			dmtype = segment.type
-			if dmtype is 'striped':
-				params = str(segment.snum) + ' ' + str(segment.stripesize) + ' '
-			space = ''
-			for chunk in segment.chunklist:
-				params += space + chunk.path + ' ' + str(chunk.size)
-				space = ' '
-			table = dm.table(start, size, dmtype, params)
-			tblist.append(table)
-			strat += size
-		dm.map(volumename, tblist)
 
 	def MapLinearVolume(self, volumename, devlist):
 		tblist = []
@@ -79,7 +56,7 @@ class ClientDeamon:
 			tblist.append(table)
 			start += size
 			i += 3
-		dm.map(volumename, tablist)
+		dm.map(name, tblist)
 
 	def MapVolume(self, req):
 		volumename = req.volume.parameters[0]
@@ -104,14 +81,19 @@ class ClientDeamon:
 		ret.error = ''
 		return ret
 
-	def UnmapVolume(self, req):
+	def SplitVolume(self, req):
 		del VolumeDict[req.name]
-		volume = VolumeDict[name]			
-		for subvolume in volume.subvolumes:
-			VolumeDict[subvolume.parameters[0]] = subvolume
+		maps = dm.maps()
+		for mp in maps:
+			if mp.name == req.name:
+				mp.remove()
 		ret = msg.UnmapVolume_Response()
 		ret.error = ''
 		return ret
+
+	def ClientWriteVolume(self, req):
+		volume = msg2obj[req.volume]
+		VolumeDict[req.name] = volume
 
 	def ClientDeleteVolume(self, req):
 		self.DeleteVolumeTree(req.name)
@@ -124,6 +106,7 @@ class ClientDeamon:
 			volume = VolumeDict[name]
 		else:
 			return False
+		del VolumeDict[name]
 		if volume.assembler == 'chunk':
 			del VolumeDict[name]
 			return True
@@ -131,39 +114,6 @@ class ClientDeamon:
 			self.DeleteVolumeTree(subvolume)
 		return True
 
-	def RestoreVolumeInfo(self, volume = None):
-		mplist = dm.maps()
-		for mp in mplist:
-			volume = self.ReadVolume(mp.name)
-			if not volume == None:
-				VolumeDict[mp.name] = volume
-
-	def ReadVolumeInfo(self, name, addr=Mds_IP, port=Mds_Port):
-		if not isinstance(name, str):
-			path = Guid.toStr(name)
-		with BuildStub(guid, addr, port, mds.MDS) as stub:
-			req = msg.ReadVolume_Request()
-			req.fullpath = '/'+path
-			ret = stub.callMethod('ReadVolume', req)
-		volume = msg.Volume()
-		volume.ParseFromString(ret.volume)
-		return volume
-
-def test(server):
-	mdsser = Object()
-	mdsser.ServiceAddress = Mds_IP
-	mdsser.ServicePort = Mds_Port
-	serlist = server.GetChunkServers(mdsser)
-	print serlist
-	# chksize = 10
-	# chksizes = [chksize]
-	# server.NewChunkList(chksizes)
-
-	# req = clmsg.NewVolume_Request()
-	# req.volume_name = 'testlinear'
-	# req.volume_size = 20
-	# req.chunk_size.append(20)
-	# server.NewVolume(req)
 
 if __name__=='__main__':
 	logging.basicConfig(level=logging.DEBUG)

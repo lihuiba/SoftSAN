@@ -155,10 +155,10 @@ if __name__=='__main__':
 				augment with a --sort option, but any
 				use of --sort=none (-U) disables grouping
 			  '''
-	cfgdict = {'MDS_IP':['M','192.168.0.149','ip address of metadata server'], \
-				'MDS_PORT':['m','6789','port of metadata server'], \
-				'CHK_IP':['C','192.168.0.149',longstr], \
-				'CHK_PORT':['c','3456',''],\
+	cfgdict = {'MDS_IP':['M','192.168.0.12','ip address of metadata server'], \
+				'MDS_PORT':['m','1234','port of metadata server'], \
+				'CHK_IP':['C','192.168.0.12',longstr], \
+				'CHK_PORT':['c','4321',''],\
 				'enablexxx':['x',False,'whether enable x']}
 
 	cfgfile = '/home/hanggao/SoftSAN/test.conf'
