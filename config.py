@@ -2,13 +2,33 @@ import getopt, sys
 import getopt, sys
 import ConfigParser, string
 
-def config(cfgdict, filename, section='test'):
+def config(cfgdict):
+	
+	usage_print(cfgdict)
+	# get value from command
+	abbrevstring=''
+	verbose = []
+	for key in cfgdict:
+		if isinstance(cfgdict[key][1], bool):
+			verbose.append(key)
+			abbrevstring += cfgdict[key][0]
+		else:
+			verbose.append(key+'=')
+			abbrevstring += (cfgdict[key][0]+':')
+	opts, noOpt_args = getopt.getopt(sys.argv[1:], abbrevstring, verbose)
+	# check whether the config file is specified in cmdline
+	filename = cfgdict['cfgfile'][1]
+	for opt,value in opts:
+		if opt=='--cfgfile' or opt=='-f':
+			filename = value
+	# update the value of configuration parameters from config file, file name is specified in cfgdict['cfgfile']
 	try:
 		fp=open(filename,'rb')
 		config = ConfigParser.ConfigParser()
 		config.readfp(fp)
 		fp.close()
 		# print 'original value:'.ljust(20,' '), cfgdict
+		section='default'
 		for key in cfgdict:
 			try:
 				value = config.get(section,key)
@@ -22,26 +42,9 @@ def config(cfgdict, filename, section='test'):
 				pass
 	except:
 		pass
-	# print 'get value from file:'.ljust(20,' '), cfgdict
-	# get value from command
-	abbrevstring=''
-	verbose = []
-	for key in cfgdict:
-		if isinstance(cfgdict[key][1], bool):
-			verbose.append(key)
-			abbrevstring += cfgdict[key][0]
-		else:
-			verbose.append(key+'=')
-			abbrevstring += (cfgdict[key][0]+':')
-	# print 'abbrevstring:', abbrevstring
-	# print 'verbose:', verbose
-	# try:
-	opts, args = getopt.getopt(sys.argv[1:], abbrevstring, verbose)
-	# except getopt.GetoptError, err:
-	# 	print str(err) # will print something like "option -a not recognized"
-	# 	sys.exit(2)
+	# update the value of configuration parameters from cmdline
 	# print 'opts:',opts
-	# print 'args:',args
+	# print 'args:',noOpt_args
 	for o,a in opts:
 		o = o.lstrip('-')
 		if o in cfgdict:
@@ -58,16 +61,15 @@ def config(cfgdict, filename, section='test'):
 	# print 'get value from command:'.ljust(20,' '), cfgdict
 	ret_dict = dict([key,cfgdict[key][1]] for key in cfgdict)
 	# print the usage message
-	# usage_print(cfgdict)
-	return ret_dict
+	return ret_dict, noOpt_args
 
-def usage_print(cfgdict, breadth1=5, breadth2=2, breadth3=40):
+def usage_print(cfgdict, breadth1=5, breadth2=2, breadth3=50):
 	for key in cfgdict:
 		print ('  --'+key+',').ljust(breadth1,' ',),' ','-'+cfgdict[key][0].ljust(breadth2,' ',)
-		longstr=cfgdict[key][2]+" (default: {0})".format(cfgdict[key][1])
-		indent_print(longstr, breadth3,breadth1+breadth2+10)
-		
-def indent_print(longstr,  breadth=30, indent=25):
+		longstr=cfgdict[key][2]+" (default:"+str(cfgdict[key][1])+')'
+		indent_print(longstr, breadth3, breadth1+breadth2+20)
+
+def indent_print(longstr,  breadth=50, indent=15):
 	longstr = string.replace(longstr,'\n',' ')
 	longstr = string.replace(longstr, '\t',' ')
 	lst = longstr.split()
@@ -82,18 +84,26 @@ def indent_print(longstr,  breadth=30, indent=25):
 		else:
 			print head, line
 			line = word+' '
+	print head,line
 
 if __name__ == '__main__':
-	longstr = '''group directories before files.
+	helpmsg = '''group directories before files.
 				augment with a --sort option, but any
 				use of --sort=none (-U) disables grouping
 			  '''
-	cfgdict = {'MDS_IP':['M','192.168.0.149','ip address of metadata server'], \
+	default_cfgfile = './test.conf'
+
+	cfgdict = {'MDS_IP':['M', '192.168.0.149', 'ip address of metadata server'], \
 				'MDS_PORT':['m','6789','port of metadata server'], \
-				'CHK_IP':['C','192.168.0.149',longstr], \
-				'CHK_PORT':['c','3456',''],\
-				'enablexxx':['x',False,'whether enable x']}
-	cfgfile = '/home/hanggao/SoftSAN/test.conf'
-	argudict = config(cfgdict, cfgfile)
+				'CHK_IP':['C', '192.168.0.149', helpmsg], \
+				'CHK_PORT':['c', '3456', 'the port of chunk server'],\
+				'enablexxx':['x',False,'enable x'],\
+				'cfgfile':['f', default_cfgfile, 'name of the configuration file']}
+
+	argudict, noOpt_args = config(cfgdict)
+	# print argudict
+	# print noOpt_args
 	# for key in argudict:
 	# 	print key, '=', argudict[key],' '
+
+	# cfgdict must contain the cfgfile and the default value is specified.
