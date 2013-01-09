@@ -134,6 +134,7 @@ class ChunkServerClient:
 		stub = self.getStub()
 		req = msg.DisassembleVolume_Request()
 		req.access_point = nodename
+		# retrun value include access point of volume
 		ret = stub.callMethod('DisassembleVolume', req)
 
 	def Clear():
