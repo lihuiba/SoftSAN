@@ -256,7 +256,7 @@ class Client:
 			return False
 
 		req = msg.SplitVolume_Request()
-		req.name = volumename
+		req.volume_name = volumename
 		ret = self.stub.callMethod('SplitVolume', req)
 		self.mds.DeleteVolumeInfo(volume) 
 
@@ -311,7 +311,7 @@ class Client:
 		volume.assembler = voltype
 		volume.subvolumes = vollist
 		volume.guid = Guid.toStr(Guid.generate())
-		volume.parameters = [volname, '/dev/mapper/'+volname]
+		volume.parameters = [volname, '/dev/mapper/'+volname, 'active']
 		volume.parameters.extend(params)
 
 		ret = self.MapVolume(volume)
@@ -332,7 +332,7 @@ class Client:
 			name = name.parameters[0]
 		self.DeleteVolumeTree(name)
 		req = msg.ClientDeleteVolume_Request()
-		req.name = name
+		req.volume_name = name
 		ret = self.stub.callMethod('ClientDeleteVolume', req)
 
 	def DeleteVolumeTree(self, volume):

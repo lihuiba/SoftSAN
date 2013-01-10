@@ -172,7 +172,7 @@ def ParseArg(client):
 
 def test():
 	#sys.argv = 'softsan-cli.py --create no1 60 striped 2'.split()
-	sys.argv = 'softsan-cli.py -s no1'.split()
+	sys.argv = 'softsan-cli.py --mount no1'.split()
 	client = Client.Client('192.168.0.12', 1234)
 	args = ParseArg(client)
 	if isinstance(args, Object):
