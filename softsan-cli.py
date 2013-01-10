@@ -39,8 +39,8 @@ def ParseTable(words):
 			arg.type = 'gfs'
 			return arg
 		else:
-			error = 'Unrecognized argument: ' + words[argc]
-			print error
+			print 'Unrecognized argument: ' + words[argc]
+			return None
 		argc += 1
 		if argc >= num:
 			return arg
@@ -111,27 +111,25 @@ def isExclusive(args):
 def ParseArg(client):
 	cfgfile = './tests.conf'
 	ArgsDict={'create' :['c',  '',       'create a volume'],\
-			  'table'  :['t',  sys.stdin,'volume construction table'],\
 			  'params' :['p',  '',		 'volume parameters' ],\
 			  'remove' :['rm', '',		 'remove a volume'],\
 			  'info'   :['i',  '',		 'list object information'],\
 			  'split'  :['sp',   '',     'split a volume into subvolumes'],\
 			  'mount'  :['mo',   '',     'Mount a exist volume'],\
 			  'unmount':['um',   '',	 'Unmount a volume'],\
-			  'cfgfile':['f', cfgfile, 'configuation file of SoftSAN']
-	}
+			  'cfgfile':['f', cfgfile,   'configuation file of SoftSAN']	}
+
 	ret, remains = config.config(ArgsDict)
 	args = Object(ret)
 
-	print sys.argv
-	print ret
 	print remains
+	print args.params
 
 	if args.create != '':
 		name = args.create
 		words = [name]
 		words.extend(remains)
-		data = ParseTable(args.table)
+		data = ParseTable(words)
 		if isinstance(data, Object) == False:
 			print 'table format error'
 			return None
@@ -158,6 +156,9 @@ def ParseArg(client):
 		name = args.unmount
 		func = 'Unmount'
 	if isinstance(data,str):
+		if len(remains)>0:
+			print 'Invalid argument'
+			return None
 		error = CheckName(client.mds, data)
 		if error != '':
 			print error
@@ -167,8 +168,8 @@ def ParseArg(client):
 	return data
 
 def test():
-	#sys.argv = ['softsan-cli.py', '--create', 'test', '200', 'linear', '2']
-	sys.argv = ['softsan-cli.py', '--info', 'hello_softsan_striped']
+	#sys.argv = 'softsan-cli.py --create no1 60 striped 2'.split()
+	sys.argv = 'softsan-cli.py --split no1'.split()
 	client = Client.Client('192.168.0.12', 1234)
 	args = ParseArg(client)
 	if isinstance(args, Object):
@@ -178,6 +179,8 @@ def test():
 		print args.chunksizes, len(args.chunksizes)
 		print args.subvolumes, len(args.subvolumes)
 		print args.parameters, len(args.parameters)
+	else:
+		print args
 
 if __name__=='__main__':
 	test()

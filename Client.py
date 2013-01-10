@@ -211,6 +211,11 @@ class Client:
 		return errorinfo
 		
 	def MountVolume(self, volume):
+		if isinstance(volume, str):
+			volume = self.mds.ReadVolumeInfo(volume)
+			req = msg.MountVolume_Request()
+			obj2msg(volume, req.volume)
+			self.stub.callMethod('MountVolume', req)
 		if volume.assembler == 'chunk':
 			self.MountChunk(volume)
 			return True
@@ -219,6 +224,11 @@ class Client:
 		return True
 
 	def UnmountVolume(self, volume):
+		if isinstance(volume, str):
+			volume = self.mds.ReadVolumeInfo(volume)
+			req = msg.UnmountVolume_Request()
+			req.name = volume.parameters[0]
+			self.stub.callMethod('UnmountVolume', req)
 		if volume.assembler == 'chunk':
 			addr = volume.parameters[3]
 			port = int(volume.parameters[4])
@@ -240,12 +250,15 @@ class Client:
 		return False
 
 	def SplitVolume(self, volumename):
+		volume = self.mds.ReadVolumeInfo(volumename)
+		if volume.subvolumes[0].assembler == 'chunk':
+			logging.error('This volume is not divisible!')
+			return False
+
 		req = msg.SplitVolume_Request()
 		req.name = volumename
 		ret = self.stub.callMethod('SplitVolume', req)
-
-		volume = self.mds.ReadVolumeInfo(volumename)
-		self.mds.DeleteVolumeInfo(volume)
+		self.mds.DeleteVolumeInfo(volume) 
 
 	def CreateVolume(self, arg):
 		vollist = []
@@ -333,11 +346,6 @@ class Client:
 			self.UnmountChunk(volume)
 			chkclient.DeleteChunk(volume)
 			return True
-		mps = dm.maps()
-		name = volume.parameters[0]
-		for mp in mps:
-			if name == mp.name:
-				mp.remove()
 		for subvolume in volume.subvolumes:
 			self.DeleteVolumeTree(subvolume)
 

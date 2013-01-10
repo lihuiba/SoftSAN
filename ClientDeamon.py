@@ -70,10 +70,12 @@ class ClientDeamon:
 			return False
 		return True
 
-	def MapVolume(self, req):
+	def MapVolume(self, req):		
 		volumename = req.volume.parameters[0]
 		size = req.volume.size
 		dmtype = req.volume.assembler
+
+		logging.debug('Mapping volume:', req.volume.parameters[0])
 
 		if dmtype == 'linear':
 			result = self.MapLinearVolume(volumename, req.volume.subvolumes)
@@ -89,6 +91,7 @@ class ClientDeamon:
 		ret = msg.MapVolume_Response()
 		if result == False:
 			ret.error = 'device mapper: Mapping volume failed'
+			logging.error(ret.error)
 			return ret
 
 		VolumeDict[volumename] = req.volume
@@ -104,6 +107,20 @@ class ClientDeamon:
 		ret = msg.UnmapVolume_Response()
 		ret.error = ''
 		return ret
+
+	def MountVolume(self, volume):
+		if not isinstance(volume, Object):
+			volume = msg2obj(volume.volume)
+		if volume.assembler == 'chunk':
+			return True
+		for vol in subvolumes:
+			self.MountVolume(vol)
+		req = Object()
+		req.volume = volume
+		self.MapVolume(req)
+
+	def UnmountVolume(self, req):
+		self.DeleteVolumeTree(req.name)
 
 	def ClientWriteVolume(self, req):
 		volume = msg2obj[req.volume]
@@ -124,6 +141,11 @@ class ClientDeamon:
 		if volume.assembler == 'chunk':
 			del VolumeDict[name]
 			return True
+		mps = dm.maps()
+		name = volume.parameters[0]
+		for mp in mps:
+			if name == mp.name:
+				mp.remove()
 		for subvolume in volume.subvolumes:
 			self.DeleteVolumeTree(subvolume)
 		return True
