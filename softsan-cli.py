@@ -112,15 +112,18 @@ def ParseArg(client):
 	cfgfile = './tests.conf'
 	ArgsDict={'create' :['c',  '',       'create a volume'],\
 			  'params' :['p',  '',		 'volume parameters' ],\
-			  'remove' :['rm', '',		 'remove a volume'],\
+			  'remove' :['r',  '',		 'remove a volume'],\
 			  'info'   :['i',  '',		 'list object information'],\
-			  'split'  :['sp',   '',     'split a volume into subvolumes'],\
-			  'mount'  :['mo',   '',     'Mount a exist volume'],\
-			  'unmount':['um',   '',	 'Unmount a volume'],\
+			  'split'  :['s',  '',       'split a volume into subvolumes'],\
+			  'mount'  :['m',  '',       'Mount a exist volume'],\
+			  'unmount':['u',  '',	     'Unmount a volume'],\
 			  'cfgfile':['f', cfgfile,   'configuation file of SoftSAN']	}
 
 	ret, remains = config.config(ArgsDict)
 	args = Object(ret)
+
+	if not isExclusive():
+		print 'Invalid argument'
 
 	print remains
 	print args.params
@@ -169,7 +172,7 @@ def ParseArg(client):
 
 def test():
 	#sys.argv = 'softsan-cli.py --create no1 60 striped 2'.split()
-	sys.argv = 'softsan-cli.py --split no1'.split()
+	sys.argv = 'softsan-cli.py -s no1'.split()
 	client = Client.Client('192.168.0.12', 1234)
 	args = ParseArg(client)
 	if isinstance(args, Object):
