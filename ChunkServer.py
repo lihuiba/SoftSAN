@@ -54,7 +54,7 @@ class ChunkServer:
 			ret.error=('failed to Disassemble Volume'+target_name)
 		return ret
 
-# try to create every requested chunk.however, if some chunk can not be created, fill the ret.error with the output of lvcreate 
+# try to create every requested chunk. however, if some chunk can not be created, fill the ret.error with the output of lvcreate 
 	def NewChunk(self, req):
 		self.lvm.reload()
 		ret = msg.NewChunk_Response()
@@ -124,6 +124,8 @@ def heartBeat(server):
 def test_ChunkServer():
 	print '     test begin     '.center(100,'-')
 	print
+	server=ChunkServer()
+	logging.basicConfig(level=logging.DEBUG)	
 	# mock the newchunk request from client
 	req_newchunk=msg.NewChunk_Request()
 	req_newchunk.size=32
@@ -134,22 +136,21 @@ def test_ChunkServer():
 	Guid.assign(req_assemblevolume.volume.guid, ret_newchunk.guids[-1])
 	req_assemblevolume.volume.size=32
 	ret_assemblevolume = server.AssembleVolume(req_assemblevolume)
-	# mock req_disassemblevolume
-	req_disassemblevolume = msg.DisassembleVolume_Response()
-	req_disassemblevolume.access_point = ret_assemblevolume.access_point
-	ret_disassemblevolume = server.DisassembleVolume(req_disassemblevolume)
-	print ret_disassemblevolume.access_point
+	# # mock req_disassemblevolume
+	# req_disassemblevolume = msg.DisassembleVolume_Response()
+	# req_disassemblevolume.access_point = ret_assemblevolume.access_point
+	# ret_disassemblevolume = server.DisassembleVolume(req_disassemblevolume)
+	# print ret_disassemblevolume.access_point
 	# mock the delchunk request from client
-	req_delchunk = msg.DeleteChunk_Request()
- 	for a_guid in ret_newchunk.guids:
-		t=req_delchunk.guids.add()
-		Guid.assign(t, a_guid)
-	ret_delchunk = server.DeleteChunk(req_delchunk)
+	# req_delchunk = msg.DeleteChunk_Request()
+ # 	for a_guid in ret_newchunk.guids:
+	# 	t=req_delchunk.guids.add()
+	# 	Guid.assign(t, a_guid)
+	# ret_delchunk = server.DeleteChunk(req_delchunk)
 	print
 	print '     test end     '.center(100,'-')
 
-
-if __name__=='__main__':
+def link_test():
 	longstr = '''this is a long string example:
 				group directories before files.
 				augment with a --sort option, but any
@@ -174,4 +175,9 @@ if __name__=='__main__':
 	service=rpc.RpcService(server)
 	framework=gevent.server.StreamServer(('0.0.0.0',int(PARAM.CHK_PORT)), service.handler)
 	framework.serve_forever()
+
+
+
+if __name__=='__main__':
 	
+	test_ChunkServer()

@@ -17,7 +17,8 @@ def config(cfgdict):
 			abbrevstring += (cfgdict[key][0]+':')
 	opts, noOpt_args = getopt.getopt(sys.argv[1:], abbrevstring, verbose)
 	# check whether the config file is specified in cmdline
-	filename = cfgdict['cfgfile'][1]
+	if cfgdict.has_key('cfgfile'):
+		filename = cfgdict['cfgfile'][1]
 	for opt,value in opts:
 		if opt=='--cfgfile' or opt=='-f':
 			filename = value
