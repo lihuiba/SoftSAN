@@ -1,10 +1,13 @@
-import Client
+#!/usr/bin/python
+import Client, config
 from argparse import ArgumentParser as ArgParser
 from mds import Object
+import sys, os
+
 
 CHUNKSIZE = 64
 
-def ParseLine(words):
+def ParseTable(words):
 	arg = Object()
 	arg.name = ''
 	arg.size = 0
@@ -87,108 +90,87 @@ def CheckName(mds, name):
 		return 'Volume ' + name + ' is not exsit!'
 	return ''
 
-def ParseArgs(client):
-	parser = ArgParser()
-	subparsers = parser.add_subparsers()
-	# create
-	parser_create = subparsers.add_parser('create', help='create a volume')
-	parser_create.add_argument('table', nargs='+', help='table to build a volume')
-	parser_create.add_argument('--file', dest='path', help='table file')
-	parser_create.add_argument('--params', '-p', help='voluem parameters')
-	parser_create.set_defaults(func='Create')
-	# remove
-	parser_remove = subparsers.add_parser('remove', help='remove a volume')
-	parser_remove.add_argument('volume_name', help='volume to be removed')
-	parser_remove.set_defaults(func='Delete')
-	# list
-	parser_list = subparsers.add_parser('list', help='show volume info')
-	parser_list.add_argument('volume_name', help='volume to be removed')
-	parser_list.set_defaults(func='List')
-	# split
-	parser_split = subparsers.add_parser('split', help='split a volume')
-	parser_split.add_argument('volume_name', help='volume to be removed')
-	parser_split.set_defaults(func='Split')
-	# mount
-	parser_mount = subparsers.add_parser('mount', help='mount a volume')
-	parser_mount.add_argument('volume_name', help='volume to be removed')
-	parser_mount.set_defaults(func='Mount')
-	# unmount
-	parser_unmount = subparsers.add_parser('unmount', help='unmount a volume')
-	parser_unmount.add_argument('volume_name', help='volume to be removed')
-	parser_unmount.set_defaults(func='Unmount')
+def isExclusive(args):
+	flag = 0
+	if args.create != '':
+		flag += 1
+	if args.remove != '':
+		flag += 1
+	if args.split != '':
+		flag += 1
+	if args.info != '':
+		flag += 1
+	if args.mount != '':
+		flag += 1
+	if args.unmount != '':
+		flag += 1
+	if flag == 0 or flag > 1:
+		return False
+	return True
 
-	#args = parser.parse_args('create striped_device 180 striped 2 90 90'.split())
-	#args = parser.parse_args('create striped_device_2 18 striped 3 6 6 6'.split())
-	#args = parser.parse_args('remove striped_device_2'.split())
-	#args = parser.parse_args('remove hello_softsan_striped_2'.split())
-	print args
+def ParseArg(client):
+	cfgfile = './tests.conf'
+	ArgsDict={'create' :['c',  '',       'create a volume'],\
+			  'table'  :['t',  sys.stdin,'volume construction table'],\
+			  'params' :['p',  '',		 'volume parameters' ],\
+			  'remove' :['rm', '',		 'remove a volume'],\
+			  'info'   :['i',  '',		 'list object information'],\
+			  'split'  :['sp',   '',     'split a volume into subvolumes'],\
+			  'mount'  :['mo',   '',     'Mount a exist volume'],\
+			  'unmount':['um',   '',	 'Unmount a volume'],\
+			  'cfgfile':['f', cfgfile, 'configuation file of SoftSAN']
+	}
+	ret, remains = config.config(ArgsDict)
+	args = Object(ret)
 
-	if args.func == 'Create':
-		data = ParseLine(args.table)
+	print sys.argv
+	print ret
+	print remains
+
+	if args.create != '':
+		name = args.create
+		words = [name]
+		words.extend(remains)
+		data = ParseTable(args.table)
 		if isinstance(data, Object) == False:
 			print 'table format error'
 			return None
 		if args.params:
 			strsize = int(args.params)
-			# if strsize != 256 and strsize != 512 and strsize != 1024 and strsize != 2048:
-			# 	print 'stripe size only can be: 256/512/1024/2048'
-			# 	return None
+			if strsize != 256 and strsize != 512 and strsize != 1024 and strsize != 2048:
+				print 'stripe size only can be: 256/512/1024/2048'
+				return None
 			data.parameters.append(args.params)
-	else:
-		data = args.volume_name
+		func = 'Create'
+	if args.remove != '':
+		data = args.remove
+		func = 'Delete'
+	if args.info != '':
+		data = args.info
+		func = 'Info'
+	if args.split != '':
+		data = args.split
+		func = 'Split'
+	if args.mount != '':
+		data = args.mount
+		func = 'Mount'
+	if args.unmount != '':
+		name = args.unmount
+		func = 'Unmount'
+	if isinstance(data,str):
 		error = CheckName(client.mds, data)
-		if not error == '':
+		if error != '':
 			print error
 			return None
-	
-	getattr(client, args.func+'Volume')(data)
+
+	getattr(client, func+'Volume')(data)
 	return data
 
-
-# def ParseFile(path):
-# 	fp = open(path)
-# 	lines = fp.readlines()
-# 	for line in lines:
-# 		ParseLine(line)
-
-# def ParseArg(client):
-# 	ArgsDict={'create' :['c',  '',       'create a volume'],
-# 			  'table'  :['t',  sys.stdin,'volume construction table'],
-# 			  'remove' :['rm', '',		 'remove a volume'],
-# 			  'list'   :['l',  '',		 'list object information'],
-# 			  'unmap'  :['',   '',       'split a volume into subvolumes'],
-# 			  'mount'  :['',   '',       'Mount a exist volume'],
-# 			  'unmount':['',   '',		 'Unmount a volume']
-# 	}
-# 	ArgsFile = 'test.conf'
-# 	args = Object(config.config(ArgsDict, ArgsFile))
-
-# 	print args.create
-
-	# if hasattr(args, 'create'):
-	# 	print args.create
-	# 	#arg = ParseLine(args.create)
-	# 	#print arg.name, arg.size, arg.type, arg.chksizes
-	# 	#client.create(arg)
-	# if hasattr(args, 'remove'):
-	# 	name = args.remove
-	# 	client.remove(name)
-	# if hasattr(args, 'list'):
-	# 	name = args.list
-	# 	client.list(name)
-	# if hasattr(args, 'unmap'):
-	# 	name = args.unmap
-	# 	client.unmap(name)
-	# if hasattr(args, 'mount'):
-	# 	name = args.mount
-	# 	client.mount(name)
-	# if hasattr(args, 'unmount'):
-	# 	name = args.unmount
-	# 	client.unmount(name)
-
 def test():
+	#sys.argv = ['softsan-cli.py', '--create', 'test', '200', 'linear', '2']
+	sys.argv = ['softsan-cli.py', '--info', 'hello_softsan_striped']
 	client = Client.Client('192.168.0.12', 1234)
-	args = ParseArgs(client)
+	args = ParseArg(client)
 	if isinstance(args, Object):
 		print args.name
 		print args.size
