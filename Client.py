@@ -37,12 +37,11 @@ class MDSClient:
 		return serverlist
 
 	def WriteVolumeInfo(self, volume):
-		if isinstance(volume, str):
-			path = volume
-		else:
-			path = volume.parameters[0]
+		path = volume.parameters[0]
 		req = msg.WriteVolume_Request()
-		req.volume = volume.SerializeToString()
+		msgvolume = msg.Volume()
+		obj2msg(volume, msgvolume)
+		req.volume = msgvolume.SerializeToString()
 		req.fullpath = '/'+path
 		ret = self.stub.callMethod('WriteVolume', req)
 
@@ -211,21 +210,31 @@ class Client:
 		return errorinfo
 		
 	def MountVolume(self, volume):
-		if isinstance(volume, str):
-			volume = self.mds.ReadVolumeInfo(volume)
-			req = msg.MountVolume_Request()
-			obj2msg(volume, req.volume)
-			self.stub.callMethod('MountVolume', req)
+		volume = self.mds.ReadVolumeInfo(volume)
+		if volume.parameters[2] == 'active':
+			logging.error('volume {0} is already mounted!'.fromat(volume.parameters[0]))
+			return False
+		req = msg.MountVolume_Request()
+		obj2msg(volume, req.volume)
+		self.stub.callMethod('MountVolume', req)
+		if self.MountVolumeTree(volume) == True:
+			volume.parameters[2] = 'inactive'
+		return True
+
+	def MountVolumeTree(self, volume):
 		if volume.assembler == 'chunk':
 			self.MountChunk(volume)
 			return True
 		for subvol in volume.subvolumes:
-			self.MountVolume(subvol)
+			self.MountVolumeTree(subvol)
 		return True
 
 	def UnmountVolume(self, volume):
 		if isinstance(volume, str):
 			volume = self.mds.ReadVolumeInfo(volume)
+			if volume.parameters[2] == 'inactive':
+				logging.error('volume {0} is already unmounted!'.fromat(volume.parameters[0]))
+				return False
 			req = msg.UnmountVolume_Request()
 			req.name = volume.parameters[0]
 			self.stub.callMethod('UnmountVolume', req)
@@ -238,6 +247,7 @@ class Client:
 			return True
 		for subvol in volume.subvolumes:
 			self.UnmountVolume(subvol)
+		volume.parameters[2] = 'inactive'
 		return True
 
 	def MapVolume(self, volume):
@@ -258,7 +268,11 @@ class Client:
 		req = msg.SplitVolume_Request()
 		req.volume_name = volumename
 		ret = self.stub.callMethod('SplitVolume', req)
-		self.mds.DeleteVolumeInfo(volume) 
+		error = self.mds.DeleteVolumeInfo(volume)
+		if error != '':
+			logging.error(error)
+			return False
+		return True
 
 	def CreateVolume(self, arg):
 		vollist = []
@@ -274,8 +288,11 @@ class Client:
 		if len(volnames) > 0:
 			for name in volnames:
 				vol = self.mds.ReadVolumeInfo(name)
+				if vol.parameters[3] == 'used':
+					print 'volume '+name+' has been used'
+					return False
 				if vol == None:
-					pass
+					return False
 				vollist.append(vol)
 		
 		if len(chksizes) == 0 and len(volnames) == 0:
@@ -303,15 +320,12 @@ class Client:
 				return False
 			for vol in vollist:
 				print 'vol.size: ', vol.size
-				msgvol = msg.Volume()
-				obj2msg(vol, msgvol)
-				self.mds.WriteVolumeInfo(msgvol)
 
 		volume.size = volsize
 		volume.assembler = voltype
 		volume.subvolumes = vollist
 		volume.guid = Guid.toStr(Guid.generate())
-		volume.parameters = [volname, '/dev/mapper/'+volname, 'active']
+		volume.parameters = [volname, '/dev/mapper/'+volname, 'active', 'free']
 		volume.parameters.extend(params)
 
 		ret = self.MapVolume(volume)
@@ -322,9 +336,12 @@ class Client:
 					self.DeleteVolumeTree(subvol)
 			return False
 
-		msgvolume = msg.Volume()
-		obj2msg(volume, msgvolume)
-		self.mds.WriteVolumeInfo(msgvolume)
+		self.mds.WriteVolumeInfo(volume)
+		if len(volnames) > 0:
+			for vol in vollist:
+				vol.parameters[3] = 'used'
+		for vol in vollist:
+			self.WriteVolumeInfo(vol)
 		return True
  
 	def DeleteVolume(self, name):
