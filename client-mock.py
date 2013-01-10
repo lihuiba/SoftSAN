@@ -8,7 +8,7 @@ import guid as Guid
 MDS_IP='192.168.0.149'
 MDS_PORT=2340
 CHK_IP='192.168.0.149'
-CHK_PORT=67802
+CHK_PORT=6780
 
 logging.basicConfig(level=logging.DEBUG)
 socket=gevent.socket.socket()

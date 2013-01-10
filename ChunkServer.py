@@ -125,28 +125,31 @@ def test_ChunkServer():
 	print '     test begin     '.center(100,'-')
 	print
 	server=ChunkServer()
-	logging.basicConfig(level=logging.DEBUG)	
+	logging.basicConfig(level=logging.DEBUG)
+
 	# mock the newchunk request from client
 	req_newchunk=msg.NewChunk_Request()
 	req_newchunk.size=32
 	req_newchunk.count=1
 	ret_newchunk = server.NewChunk(req_newchunk)
+
 	# mock the assemblevolume request from client
 	req_assemblevolume=msg.AssembleVolume_Request()
 	Guid.assign(req_assemblevolume.volume.guid, ret_newchunk.guids[-1])
 	req_assemblevolume.volume.size=32
 	ret_assemblevolume = server.AssembleVolume(req_assemblevolume)
+
 	# # mock req_disassemblevolume
-	# req_disassemblevolume = msg.DisassembleVolume_Response()
-	# req_disassemblevolume.access_point = ret_assemblevolume.access_point
-	# ret_disassemblevolume = server.DisassembleVolume(req_disassemblevolume)
-	# print ret_disassemblevolume.access_point
+	req_disassemblevolume = msg.DisassembleVolume_Request()
+	req_disassemblevolume.access_point = ret_assemblevolume.access_point
+	ret_disassemblevolume = server.DisassembleVolume(req_disassemblevolume)
+
 	# mock the delchunk request from client
-	# req_delchunk = msg.DeleteChunk_Request()
- # 	for a_guid in ret_newchunk.guids:
-	# 	t=req_delchunk.guids.add()
-	# 	Guid.assign(t, a_guid)
-	# ret_delchunk = server.DeleteChunk(req_delchunk)
+	req_delchunk = msg.DeleteChunk_Request()
+ 	for a_guid in ret_newchunk.guids:
+		t=req_delchunk.guids.add()
+		Guid.assign(t, a_guid)
+	ret_delchunk = server.DeleteChunk(req_delchunk)
 	print
 	print '     test end     '.center(100,'-')
 

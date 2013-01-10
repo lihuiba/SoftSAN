@@ -54,7 +54,7 @@ class MDS:
 		servers=self.tdb.getChunkServerList()
 		servers=self.tdb.getChunkServers(servers)
 		for s in servers:
-			t=return.random.add()
+			t=ret.random.add()
 			t.ServiceAddress=s.ServiceAddress
 			t.ServicePort=int(s.ServicePort)
 		return ret

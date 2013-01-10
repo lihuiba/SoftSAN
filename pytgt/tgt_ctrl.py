@@ -16,8 +16,8 @@ def buildArguments(mode, op, **kwargs):
 
 class Tgt:
 	'''
-        attribute: targetlist
-    '''
+		attribute: targetlist
+	'''
 	def __init__(self, targetlist=None):
 		self.targetlist = targetlist or []
 		self.table1=[
@@ -77,14 +77,14 @@ class Tgt:
 		lun.blocksize=blocksize
 
 	def reload(self):
-	    argv = list()
-	    argv=buildArguments(mode='target', op='show')
-	    (status, output) = process_reload_argv(argv)
-	    self.targetlist = []
-	    self.parseLines(output)
-	    if status != 0:
-	        logging.debug("error occur reload target")
-	    return output
+		argv = list()
+		argv=buildArguments(mode='target', op='show')
+		(status, output) = process_reload_argv(argv)
+		self.targetlist = []
+		self.parseLines(output)
+		if status != 0:
+			logging.debug("error occur reload target")
+		return output
 
 	def is_in_targetlist(self, target_id):
 		self.reload()
@@ -92,95 +92,95 @@ class Tgt:
 			if target_id==target.id:
 				return True
 		return False
-			        
+					
 	def print_out(self):
-	    for target in self.targetlist:
-	        print '|'+('target name:'+target.name).center(90,'-')+'|'
-	        for lun in target.lunlist:
-	            out = 'lunindex:'+lun.index+','+'blocksize:'+lun.blocksize+','+'size:'+lun.size+','+'path:'+lun.backing_store_path
-	            print '|'+out.ljust(90)+'|'
-	    print '|'+''.ljust(90,'-')+'|'
+		for target in self.targetlist:
+			print '|'+('target name:'+target.name).center(90,'-')+'|'
+			for lun in target.lunlist:
+				out = 'lunindex:'+lun.index+','+'blocksize:'+lun.blocksize+','+'size:'+lun.size+','+'path:'+lun.backing_store_path
+				print '|'+out.ljust(90)+'|'
+		print '|'+''.ljust(90,'-')+'|'
 
 	def target_name2target_id(self, target_name):
 		for target in self.targetlist:
 			if cmp(target.name, target_name)==0:
 				return target.id
 		return None
-	    
+		
 	def new_target(self, target_id, target_name):
-	    argv = list()
-	    argv=buildArguments(mode='target', op='new', tid=target_id, T=target_name)
-	    (status, output) = process_call_argv(argv)
-	    if status != 0:
-	    	logging.info(output)
-	        return output
-	    logging.info('New target successfully, target id:',target_id)
-	    return None
+		argv = list()
+		argv=buildArguments(mode='target', op='new', tid=target_id, T=target_name)
+		(status, output) = process_call_argv(argv)
+		if status != 0:
+			logging.info(output)
+			return output
+		logging.info('New target successfully, target id: {0}'.format(target_id))
+		return None
 
 	def bind_target(self, target_id, acl='ALL'):
-	    argv = list()
-	    argv=buildArguments(mode='target', op='bind', tid=target_id, I=acl)
-	    (status, output) = process_call_argv(argv)
-	    if status != 0:
-	    	logging.debug(output)
-	        return output
-	    logging.info('Bind target successfully, target id:', target_id)
-	    return None
+		argv = list()
+		argv=buildArguments(mode='target', op='bind', tid=target_id, I=acl)
+		(status, output) = process_call_argv(argv)
+		if status != 0:
+			logging.debug(output)
+			return output
+		logging.info('Bind target successfully, target id: {0}'.format(target_id))
+		return None
 
 	def unbind_target(self, target_id, acl='ALL'):
-	    argv = list()
-	    argv=buildArguments(mode='target', op='unbind', tid=target_id, I=acl)
-	    (status, output) = process_call_argv(argv)
-	    if status != 0:
-	        return output
-       	    logging.debug(output)
-	    logging.info('Bind target successfully, target id:', target_id)
-	    return None
+		argv = list()
+		argv=buildArguments(mode='target', op='unbind', tid=target_id, I=acl)
+		(status, output) = process_call_argv(argv)
+		if status != 0:
+			return output
+			logging.debug(output)
+		logging.info('Bind target successfully, target id: {0}'.format(target_id))
+		return None
 
 	def delete_target(self, target_id):
-	    argv = list()
-   	    argv=buildArguments(mode='target', op='delete', tid=target_id)
-	    (status, output) = process_call_argv(argv)
-	    if status != 0:
-	    	logging.debug(output)
-	        return output
-	    logging.info('Delete target successfully, target id:', target_id)
-	    return None
+		argv = list()
+		argv=buildArguments(mode='target', op='delete', tid=target_id)
+		(status, output) = process_call_argv(argv)
+		if status != 0:
+			logging.debug(output)
+			return output
+		logging.info('Delete target successfully, target id:{0}'.format(target_id))
+		return None
 
-	def new_lun(self, target_id, path, lun_index='1'):
-	    argv = list()
-	    argv = buildArguments(mode='logicalunit', op='new', tid=target_id, lun=lun_index, b=path)
-	    (status, output) = process_call_argv(argv)
-	    if status != 0:
-	    	logging.debug(output)
-	        return output
-	    logging.info('New lun successfully, target id:', target_id, 'lun index:',lun_index,'path:', path)
-	    return None
+	def new_lun(self, target_id, lun_path, lun_index='1'):
+		argv = list()
+		argv = buildArguments(mode='logicalunit', op='new', tid=target_id, lun=lun_index, b=lun_path)
+		(status, output) = process_call_argv(argv)
+		if status != 0:
+			logging.debug(output)
+			return output
+		logging.info('New lun successfully, target id: {0}, lun index:{1}, path:{2}'.format(target_id, lun_index, lun_path))
+		return None
 
 	def delete_lun(self, target_id, lun_index='1'):
-	    argv = list()
-	    argv = buildArguments(mode='logicalunit', op='delete', tid=target_id, lun=lun_index)
-	    (status, output) = process_call_argv(argv)
-	    if status != 0:
-	    	logging.debug(output)
-	        return output
-	    logging.info('Delete lun successfully, target id:', target_id, 'lun index:',lun_index)
-	    return None
+		argv = list()
+		argv = buildArguments(mode='logicalunit', op='delete', tid=target_id, lun=lun_index)
+		(status, output) = process_call_argv(argv)
+		if status != 0:
+			logging.debug(output)
+			return output
+		logging.info('New lun successfully, target id: {0}, lun index:{1}'.format(target_id, lun_index))
+		return None
 
 	def new_target_lun(self, target_id, target_name, lun_path, acl='ALL'):
 		output = self.new_target(target_id, target_name) 
 		if output != None:
-			logging.debug('Assemble failure:', output)
+			logging.debug('Assemble failure:{0}'.format(output))
 			return output
 		output = self.bind_target(target_id, acl)
 		if output != None:
 			self.delete_target(target_id)
-			logging.debug('Assemble failure:', output)
+			logging.debug('Assemble failure:{0}'.format(output))
 			return output
 		output = self.new_lun(target_id, lun_path)
 		if output != None:
 			self.delete_target(target_id)
- 			logging.debug('Assemble failure:', output)
+ 			logging.debug('Assemble failure:{0}'.format(output))
 			return output
- 		logging.debug('Assemble successfully, target_id:', target_id, 'path:', lun_path)
+ 		logging.debug('Assemble successfully, target_id:{0}, lun_path:{1}'.format(target_id, lun_path))
 		return None
