@@ -22,20 +22,11 @@ Client_Port = 6789
 CHUNKSIZE = 64
 
 
-def createSocket(endpoint):
-	socket = gevent.socket.socket()
-	socket.connect(endpoint)
-	return socket
-
-def closeSocket(socket):
-	socket.close()
-
-
 class MDSClient:
 	def __init__(self, guid, mdsip, mdsport):
-		socket = gevent.socket.socket()
-		socket.connect((mdsip, mdsport))
-		self.stub = rpc.RpcStub(guid, socket, mds.MDS)
+		self.socket = gevent.socket.socket()
+		self.socket.connect((mdsip, mdsport))
+		self.stub = rpc.RpcStub(guid, self.socket, mds.MDS)
 	
 	def GetChunkServers(self, count=None):
 		arg = msg.GetChunkServers_Request()
@@ -85,11 +76,11 @@ class MDSClient:
 		req.destination = dest
 		ret = self.stub.callMethod('MoveVolume', req)
 
+	def Clear(self):
+		self.socket.close()
+
 
 class ChunkServerClient:
-	# class-level members
-	pool = Pool(createSocket, closeSocket)
-	MI=rpc.BuildMethodInfo(ChunkServer.ChunkServer)
 	
 	def __init__(self, guid, csip, csport):
 		#assert hasattr(ChunkServerClient, 'guid')
@@ -99,8 +90,9 @@ class ChunkServerClient:
 	def getStub(self):
 		if hasattr(self, 'stub'):
 			return self.stub
-		socket=self.pool.get(self.endpoint)
-		stub=rpc.RpcStub(self.guid, socket, ChunkServer.ChunkServer)
+		self.socket = gevent.socket.socket()
+		self.socket.connect(self.endpoint)
+		stub=rpc.RpcStub(self.guid, self.socket, ChunkServer.ChunkServer)
 		self.stub=stub
 		return stub
 
@@ -136,18 +128,20 @@ class ChunkServerClient:
 		req.access_point = nodename
 		ret = stub.callMethod('DisassembleVolume', req)
 
-	def Clear():
-		self.pool.dispose()
+	def Clear(self):
+		self.socket.close()
 
 
 class Client:
 	def __init__(self, mdsip, mdsport):
+		logging.basicConfig(level=logging.ERROR)
+
 		self.guid = Guid.generate()
-		self.pool = Pool(ChunkServerClient)
+		self.chkpool = Pool(ChunkServerClient, ChunkServerClient.Clear)
 		self.mds = MDSClient(self.guid, mdsip, mdsport)
-		socket = gevent.socket.socket()
-		socket.connect((Client_IP, Client_Port))
-		self.stub = rpc.RpcStub(self.guid, socket, ClientDeamon.ClientDeamon)
+		self.socket = gevent.socket.socket()
+		self.socket.connect((Client_IP, Client_Port))
+		self.stub = rpc.RpcStub(self.guid, self.socket, ClientDeamon.ClientDeamon)
 
 	# give a list of chunk sizes, return a list of volumes
     # volume : path node msg.volume
@@ -160,7 +154,7 @@ class Client:
 			server = serlist[0]
 			addr = server.ServiceAddress
 			port = server.ServicePort
-			chkclient = self.pool.get(self.guid, addr, port)
+			chkclient = self.chkpool.get(self.guid, addr, port)
 			chunks = chkclient.NewChunk(size, 1)
 			if chunks == []:
 				pass
@@ -177,7 +171,7 @@ class Client:
 			if path == None:
 				for volume in volumelist:
 					self.UnmountChunk(volume)
-				print 'Could not mount chunk'
+				logging.error('Mount chunk failed')
 				return None
 
 			volumelist.append(volume)
@@ -193,7 +187,7 @@ class Client:
 	def MountChunk(self, volume):
 		addr = volume.parameters[3]
 		port = int(volume.parameters[4])
-		chkclient = self.pool.get(self.guid, addr, port)
+		chkclient = self.chkpool.get(self.guid, addr, port)
 		target = chkclient.AssembleChunk(volume)
 		node = self.GetChunkNode(target.access_point, addr)
 		if not node == None:
@@ -211,7 +205,7 @@ class Client:
 		node = self.GetChunkNode(nodename, addr)
 		if node != None:
 			node.logout()
-		chkclient = self.pool.get(self.guid, addr, port)
+		chkclient = self.chkpool.get(self.guid, addr, port)
 		chkclient.DisassembleChunk(nodename)
 		return errorinfo
 		
@@ -227,7 +221,7 @@ class Client:
 		if volume.assembler == 'chunk':
 			addr = volume.parameters[3]
 			port = int(volume.parameters[4])
-			chkclient = self.pool.get(self.guid, addr, port)
+			chkclient = self.chkpool.get(self.guid, addr, port)
 			if chkclient.UnmountChunk(volume) == False:
 				return False
 			return True
@@ -291,8 +285,8 @@ class Client:
 		if len(chksizes) > 0:
 			vollist = self.NewChunkList(chksizes)
 			if vollist == None:
-				print 'New Chunk failed'
-				pass
+				logging.error('New Chunk failed')
+				return False
 			for vol in vollist:
 				print 'vol.size: ', vol.size
 				msgvol = msg.Volume()
@@ -308,6 +302,7 @@ class Client:
 
 		ret = self.MapVolume(volume)
 		if ret == False:
+			logging.error('Map volume failed')
 			if volume.subvolumes[0].assembler == 'chunk':
 				for subvol in volume.subvolumes:
 					self.DeleteVolumeTree(subvol)
@@ -333,7 +328,7 @@ class Client:
 		if volume.assembler == 'chunk':
 			addr = volume.parameters[3]
 			port = int(volume.parameters[4])
-			chkclient = self.pool.get(self.guid, addr, port)
+			chkclient = self.chkpool.get(self.guid, addr, port)
 			self.UnmountChunk(volume)
 			chkclient.DeleteChunk(volume)
 			return True
@@ -345,10 +340,12 @@ class Client:
 		for subvolume in volume.subvolumes:
 			self.DeleteVolumeTree(subvolume)
 
-	def ListVolume(self, name):
+	def InfoVolume(self, name):
 		volume = self.mds.ReadVolumeInfo(name)
-		print volume.parameters[0]
-		print volume.size
+		space = '      '
+		print 'name:', space, volume.parameters[0]
+		print 'path:', space, volume.parameters[1]
+		print 'size:', space, volume.size, 'MB'
 
 	def RestoreVolumeInfo(self):
 		mplist = dm.maps()
@@ -359,18 +356,28 @@ class Client:
 				obj2msg(volume, req.volume)
 				self.stub.callMethod('ClientWriteVolume', req)
 
+	def Clear(self):
+		self.socket.close()
+		self.mds.Clear()
+		self.chkpool.dispose()
+
 
 def test():
 	client = Client(Mds_IP, Mds_Port)
+	client.InfoVolume('hello_softsan_striped')
 
-	arg = Object()
-	arg.type = 'striped'
-	arg.chunksizes = []
-	arg.subvolumes = []
-	arg.parameters = []
-	arg.name = 'hello_softsan_striped'
-	arg.size = 128
-	client.CreateVolume(arg)
+	# create a stiped type volume
+	# arg = Object()
+	# arg.type = 'striped'
+	# arg.chunksizes = []
+	# arg.subvolumes = []
+	# arg.parameters = []
+	# arg.name = 'hello_softsan_striped'
+	# arg.size = 128
+	# client.CreateVolume(arg)
+
+	# create 2 linear type volumes and then 
+	# build a striped volume with these two linear volumes
 
 	# arg = Object()
 	# arg.type = 'linear'
@@ -412,6 +419,7 @@ def test():
 	# client.CreateVolume(arg)
 
 	#client.DeleteVolume('gfs')
+	client.Clear()
 	
 if __name__=='__main__':
 	test()
