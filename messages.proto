@@ -193,3 +193,51 @@ message CreateLink_Response {
     optional string error=101;
 }
 
+//client internal connection protocal
+message MapVolume_Request {
+    required Volume volume=1;
+}
+
+message MapVolume_Response {
+    required string error=101;
+}
+
+message SplitVolume_Request {
+    required string volume_name=1;
+}
+
+message SplitVolume_Response {
+    required string error=101;
+}
+
+message MountVolume_Request {
+    required Volume volume=1;
+}
+
+message MountVolume_Response {
+    required string error=101;
+}
+
+message UnmountVolume_Request {
+    required string volume_name=1;
+}
+
+message UnmountVolume_Response {
+    required string error=101;
+}
+
+message ClientWriteVolume_Request {
+    required Volume volume=1;
+}
+
+message ClientWriteVolume_Response {
+    required string error=101;
+}
+
+message ClientDeleteVolume_Request {
+    required string volume_name=1;
+}
+
+message ClientDeleteVolume_Response {
+    required string error=101;
+}

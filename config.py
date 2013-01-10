@@ -2,9 +2,8 @@ import getopt, sys
 import getopt, sys
 import ConfigParser, string
 
-def config(cfgdict):
-	
-	usage_print(cfgdict)
+def config(cfgstruct, cfgfile='cfgfile'):
+	cfgdict=dict([item[0], list(item[1:])] for item in cfgstruct)
 	# get value from command
 	abbrevstring=''
 	verbose = []
@@ -17,11 +16,17 @@ def config(cfgdict):
 			abbrevstring += (cfgdict[key][0]+':')
 	opts, noOpt_args = getopt.getopt(sys.argv[1:], abbrevstring, verbose)
 	# check whether the config file is specified in cmdline
-	if cfgdict.has_key('cfgfile'):
-		filename = cfgdict['cfgfile'][1]
-	for opt,value in opts:
-		if opt=='--cfgfile' or opt=='-f':
-			filename = value
+	if cfgdict.has_key(cfgfile):		#if app allows the user to specify a conf file name
+		filename = cfgdict[cfgfile][1]	#the default file name
+		cfgfilefull='--'+cfgfile
+		cfgfileshort='-'+cfgdict[cfgfile][0]
+		for opt,value in opts:
+			if opt==cfgfilefull or opt==cfgfileshort:	#if the user does specify a file name
+				filename = value
+				break
+	else:
+		filename = cfgfile 				#app specify a certain conf file name
+
 	# update the value of configuration parameters from config file, file name is specified in cfgdict['cfgfile']
 	try:
 		fp=open(filename,'rb')
@@ -64,10 +69,10 @@ def config(cfgdict):
 	# print the usage message
 	return ret_dict, noOpt_args
 
-def usage_print(cfgdict, breadth1=5, breadth2=2, breadth3=50):
-	for key in cfgdict:
-		print ('  --'+key+',').ljust(breadth1,' ',),' ','-'+cfgdict[key][0].ljust(breadth2,' ',)
-		longstr=cfgdict[key][2]+" (default:"+str(cfgdict[key][1])+')'
+def usage_print(cfgstruct, breadth1=5, breadth2=2, breadth3=50):
+	for item in cfgstruct:
+		print ('-'+item[1]+',').ljust(breadth2,' '), ('  --'+item[0]).ljust(breadth1,' ')
+		longstr=item[3]+" (default: "+str(item[2])+')'
 		indent_print(longstr, breadth3, breadth1+breadth2+20)
 
 def indent_print(longstr,  breadth=50, indent=15):

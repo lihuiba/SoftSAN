@@ -70,16 +70,18 @@ class ClientDeamon:
 			return False
 		return True
 
-	def MapVolume(self, req):
+	def MapVolume(self, req):		
 		volumename = req.volume.parameters[0]
 		size = req.volume.size
 		dmtype = req.volume.assembler
 
+		logging.debug('Mapping volume:', req.volume.parameters[0])
+
 		if dmtype == 'linear':
 			result = self.MapLinearVolume(volumename, req.volume.subvolumes)
 		elif dmtype == 'striped':
-			if len(req.volume.parameters) > 2:
-				stripedsize = int(req.volume.parameters[2])
+			if len(req.volume.parameters) > 3:
+				stripedsize = int(req.volume.parameters[3])
 			else:
 				stripedsize = 256
 			result = self.MapStripedVolume(volumename, stripedsize, req.volume.subvolumes)
@@ -89,6 +91,7 @@ class ClientDeamon:
 		ret = msg.MapVolume_Response()
 		if result == False:
 			ret.error = 'device mapper: Mapping volume failed'
+			logging.error(ret.error)
 			return ret
 
 		VolumeDict[volumename] = req.volume
@@ -96,21 +99,45 @@ class ClientDeamon:
 		return ret
 
 	def SplitVolume(self, req):
-		del VolumeDict[req.name]
+		del VolumeDict[req.volume_name]
 		maps = dm.maps()
 		for mp in maps:
-			if mp.name == req.name:
+			if mp.name == req.volume_name:
 				mp.remove()
 		ret = msg.UnmapVolume_Response()
 		ret.error = ''
 		return ret
 
+	def MountVolume(self, volume, dep = 0):
+		if dep == 0:
+			volume = msg2obj(volume.volume)
+		if volume.assembler == 'chunk':
+			return True
+		for vol in volume.subvolumes:
+			self.MountVolume(vol, dpe+1)
+		req = Object()
+		req.volume = volume
+		self.MapVolume(req)
+		if dep == 0:
+			ret = MountVolume_Response()
+			ret.error = ''
+			return ret
+
+	def UnmountVolume(self, req):
+		self.DeleteVolumeTree(req.volume_name)
+		ret = msg.UnmountVolume_Response()
+		ret.error = ''
+		return ret
+
 	def ClientWriteVolume(self, req):
-		volume = msg2obj[req.volume]
+		volume = msg2obj(req.volume)
 		VolumeDict[req.name] = volume
+		ret = msg.ClientWriteVolume_Response()
+		ret.error = ''
+		return ret
 
 	def ClientDeleteVolume(self, req):
-		self.DeleteVolumeTree(req.name)
+		self.DeleteVolumeTree(req.volume_name)
 		ret = msg.ClientDeleteVolume_Response()
 		ret.error = ''
 		return ret
@@ -124,6 +151,11 @@ class ClientDeamon:
 		if volume.assembler == 'chunk':
 			del VolumeDict[name]
 			return True
+		mps = dm.maps()
+		name = volume.parameters[0]
+		for mp in mps:
+			if name == mp.name:
+				mp.remove()
 		for subvolume in volume.subvolumes:
 			self.DeleteVolumeTree(subvolume)
 		return True

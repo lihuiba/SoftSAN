@@ -182,5 +182,5 @@ def link_test():
 
 
 if __name__=='__main__':
-	
-	test_ChunkServer()
+	link_test()
+	#test_ChunkServer()
