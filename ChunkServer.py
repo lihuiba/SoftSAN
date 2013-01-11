@@ -107,10 +107,13 @@ def doHeartBeat(server, stub, socket):
 		gevent.sleep(1)
 
 def heartBeat(server):
+	global PARAM
 	guid=Guid.generate()
 	stub=rpc.RpcStub(guid, None, mds.MDS)
 	while True:
 		try:
+			# print '----------------', PARAM.MDS_IP
+			# print '________________', PARAM.MDS_PORT
 			socket=gevent.socket.socket()
 			socket.connect((PARAM.MDS_IP, int(PARAM.MDS_PORT)))
 			stub.socket=socket
@@ -125,49 +128,54 @@ def test_ChunkServer():
 	print '     test begin     '.center(100,'-')
 	print
 	server=ChunkServer()
-	logging.basicConfig(level=logging.DEBUG)	
+	logging.basicConfig(level=logging.DEBUG)
+
 	# mock the newchunk request from client
 	req_newchunk=msg.NewChunk_Request()
 	req_newchunk.size=32
 	req_newchunk.count=1
 	ret_newchunk = server.NewChunk(req_newchunk)
+
 	# mock the assemblevolume request from client
 	req_assemblevolume=msg.AssembleVolume_Request()
 	Guid.assign(req_assemblevolume.volume.guid, ret_newchunk.guids[-1])
 	req_assemblevolume.volume.size=32
 	ret_assemblevolume = server.AssembleVolume(req_assemblevolume)
+
 	# # mock req_disassemblevolume
-	# req_disassemblevolume = msg.DisassembleVolume_Response()
-	# req_disassemblevolume.access_point = ret_assemblevolume.access_point
-	# ret_disassemblevolume = server.DisassembleVolume(req_disassemblevolume)
-	# print ret_disassemblevolume.access_point
+	req_disassemblevolume = msg.DisassembleVolume_Request()
+	req_disassemblevolume.access_point = ret_assemblevolume.access_point
+	ret_disassemblevolume = server.DisassembleVolume(req_disassemblevolume)
+
 	# mock the delchunk request from client
-	# req_delchunk = msg.DeleteChunk_Request()
- # 	for a_guid in ret_newchunk.guids:
-	# 	t=req_delchunk.guids.add()
-	# 	Guid.assign(t, a_guid)
-	# ret_delchunk = server.DeleteChunk(req_delchunk)
+	req_delchunk = msg.DeleteChunk_Request()
+ 	for a_guid in ret_newchunk.guids:
+		t=req_delchunk.guids.add()
+		Guid.assign(t, a_guid)
+	ret_delchunk = server.DeleteChunk(req_delchunk)
 	print
 	print '     test end     '.center(100,'-')
 
 def link_test():
-	longstr = '''this is a long string example:
-				group directories before files.
+	global PARAM
+	helpmsg = '''group directories before files.
 				augment with a --sort option, but any
 				use of --sort=none (-U) disables grouping
 			  '''
-	cfgfile = '/home/hanggao/SoftSAN/test.conf'
-	cfgdict = {'MDS_IP':['M','192.168.0.12','ip address of metadata server'], \
-				'MDS_PORT':['m','1234','port of metadata server'], \
-				'CHK_IP':['C','192.168.0.12',longstr], \
-				'CHK_PORT':['c','4321',''],\
-				'enablexxx':['x',False,'whether enable x'],\
-				'cfgfile':['f', cfgfile, 'configuation file of SoftSAN']
-				}
+	default_cfgfile = './test.conf'
+
+	cfgdict = (('MDS_IP', 'M', '192.168.0.149', 'ip address of metadata server'), \
+				('MDS_PORT','m','6789','port of metadata server'), \
+				('CHK_IP','C', '192.168.0.149', helpmsg), \
+				('CHK_PORT','c', '3456', 'the port of chunk server'),\
+				('enablexxx','x',False,'enable x'),\
+				('cfgfile','f', default_cfgfile, 'name of the configuration file'))
 
 	configure,_ = config.config(cfgdict)
 	PARAM = util.Object(configure)
-	# print PARAM.MDS_IP
+	# print PARAM.cfgfile
+	default_cfgfile = './test.conf'
+	print '----------------',PARAM.MDS_IP
 	# print configure
 	server=ChunkServer()
 	logging.basicConfig(level=logging.DEBUG)	

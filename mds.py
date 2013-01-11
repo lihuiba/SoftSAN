@@ -6,13 +6,13 @@ import persistentdb
 import gevent.socket
 import ChunkServer
 from util import *
-import rpc
+import rpc, config
 
 MDS_IP='192.168.0.12'
-MDS_PORT=1234
+MDS_PORT=6789
 CHK_IP='192.168.0.12'
 CHK_PORT=4321
-
+PARAM = None
 
 def splitbyattr(objs, key):
 	objs.sort(key = lambda x : getattr(x, key))
@@ -186,9 +186,33 @@ def buildMDS():
 
 def test_main():
 	import gevent.server, rpc
+
+	global PARAM
+	helpmsg = '''group directories before files.
+				augment with a --sort option, but any
+				use of --sort=none (-U) disables grouping
+			  '''
+	default_cfgfile = './test.conf'
+
+	cfgdict = (('MDS_IP', 'M', '192.168.0.149', 'ip address of metadata server'), \
+				('MDS_PORT','m','6789','port of metadata server'), \
+				('CHK_IP','C', '192.168.0.149', helpmsg), \
+				('CHK_PORT','c', '3456', 'the port of chunk server'),\
+				('enablexxx','x',False,'enable x'),\
+				('cfgfile','f', default_cfgfile, 'name of the configuration file'))
+
+	configure,_ = config.config(cfgdict)
+	PARAM = Object(configure)
+	# print PARAM.cfgfile
+	default_cfgfile = './test.conf'
+	print '----------------',PARAM.MDS_IP
+	print '----------------',PARAM.MDS_PORT
+
+
+
 	server=buildMDS()
 	service=rpc.RpcService(server)
-	framework=gevent.server.StreamServer(('0.0.0.0', MDS_PORT), service.handler)
+	framework=gevent.server.StreamServer(('0.0.0.0', int(PARAM.MDS_PORT)), service.handler)
 	framework.serve_forever()
 
 

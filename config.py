@@ -66,7 +66,8 @@ def config(cfgstruct, cfgfile='cfgfile'):
 			item[1] = a
 	# print 'get value from command:'.ljust(20,' '), cfgdict
 	ret_dict = dict([key,cfgdict[key][1]] for key in cfgdict)
-	# print the usage message
+	# print cfgdict
+	# # print the usage message
 	return ret_dict, noOpt_args
 
 def usage_print(cfgstruct, breadth1=5, breadth2=2, breadth3=50):
@@ -99,16 +100,16 @@ if __name__ == '__main__':
 			  '''
 	default_cfgfile = './test.conf'
 
-	cfgdict = {'MDS_IP':['M', '192.168.0.149', 'ip address of metadata server'], \
-				'MDS_PORT':['m','6789','port of metadata server'], \
-				'CHK_IP':['C', '192.168.0.149', helpmsg], \
-				'CHK_PORT':['c', '3456', 'the port of chunk server'],\
-				'enablexxx':['x',False,'enable x'],\
-				'cfgfile':['f', default_cfgfile, 'name of the configuration file']}
+	cfgdict = (('MDS_IP', 'M', '192.168.0.149', 'ip address of metadata server'), \
+				('MDS_PORT','m','6789','port of metadata server'), \
+				('CHK_IP','C', '192.168.0.149', helpmsg), \
+				('CHK_PORT','c', '3456', 'the port of chunk server'),\
+				('enablexxx','x',False,'enable x'),\
+				('cfgfile','f', default_cfgfile, 'name of the configuration file'))
 
 	argudict, noOpt_args = config(cfgdict)
-	# print argudict
-	# print noOpt_args
+	print argudict
+	print noOpt_args
 	# for key in argudict:
 	# 	print key, '=', argudict[key],' '
 
