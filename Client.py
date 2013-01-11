@@ -15,7 +15,7 @@ from util import Pool
 from collections import Iterable
 
 
-Mds_IP = '192.168.0.12'
+Mds_IP = '192.168.0.149'
 Mds_Port = 1234
 Client_IP = '192.168.0.12'
 Client_Port = 6789
@@ -132,6 +132,9 @@ class ChunkServerClient:
 		self.socket.close()
 
 
+def test_chunkserverclient():
+	pass
+
 class Client:
 	def __init__(self, mdsip, mdsport):
 		logging.basicConfig(level=logging.ERROR)
@@ -211,14 +214,14 @@ class Client:
 		
 	def MountVolume(self, volume):
 		volume = self.mds.ReadVolumeInfo(volume)
-		if volume.parameters[2] == 'active':
-			logging.error('volume {0} is already mounted!'.fromat(volume.parameters[0]))
-			return False
 		req = msg.MountVolume_Request()
 		obj2msg(volume, req.volume)
-		self.stub.callMethod('MountVolume', req)
-		if self.MountVolumeTree(volume) == True:
-			volume.parameters[2] = 'inactive'
+		ret = self.stub.callMethod('MountVolume', req)
+		if ret.error != '':
+			logging.error(ret.error)
+			return False
+		if self.MountVolumeTree(volume) == False:
+			return False
 		return True
 
 	def MountVolumeTree(self, volume):
@@ -232,12 +235,12 @@ class Client:
 	def UnmountVolume(self, volume):
 		if isinstance(volume, str):
 			volume = self.mds.ReadVolumeInfo(volume)
-			if volume.parameters[2] == 'inactive':
-				logging.error('volume {0} is already unmounted!'.fromat(volume.parameters[0]))
-				return False
-			req = msg.UnmountVolume_Request()
-			req.name = volume.parameters[0]
-			self.stub.callMethod('UnmountVolume', req)
+		req = msg.UnmountVolume_Request()
+		req.name = volume.parameters[0]
+		ret = self.stub.callMethod('UnmountVolume', req)
+		if ret.error != '':
+			logging.error(ret.error)
+			return False
 		if volume.assembler == 'chunk':
 			addr = volume.parameters[3]
 			port = int(volume.parameters[4])
