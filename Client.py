@@ -116,6 +116,8 @@ class ChunkServerClient:
 		ret = stub.callMethod('DeleteChunk', arg)
 
 	def AssembleChunk(self, volume):
+		# if isinstance(volume, msg.Volume):
+		# 	volume = msg2obj(volume)
 		stub = self.getStub()
 		req = msg.AssembleVolume_Request()
 		obj2msg(volume, req.volume)
@@ -132,9 +134,6 @@ class ChunkServerClient:
 	def Clear(self):
 		self.socket.close()
 
-
-def test_chunkserverclient():
-	pass
 
 class Client:
 	def __init__(self, mdsip, mdsport):
@@ -453,9 +452,6 @@ def test():
 	client.Clear()
 
 
-
-
-
 # socket.close()
 def configuration():
 	global PARAM
@@ -481,49 +477,45 @@ def configuration():
 
 def test_with_chkserv():
 	global PARAM
-	logging.basicConfig(level=logging.DEBUG)
-	socket=gevent.socket.socket()
-	socket.connect((PARAM.MDS_IP, int(PARAM.MDS_PORT)))
-	guid=msg.Guid()
-	guid.a=10
-	guid.b=22
-	guid.c=30
-	guid.d=40
-	stub=rpc.RpcStub(guid, socket, mds.MDS)
-	arg=msg.GetChunkServers_Request()
-	ret=stub.callMethod('GetChunkServers', arg)
 
-	s2=gevent.socket.socket()
-	s2.connect((ret.random[0].ServiceAddress, ret.random[0].ServicePort))
-	stub2=rpc.RpcStub(guid, s2, ChunkServer.ChunkServer)
+	# logging.basicConfig(level=logging.DEBUG)
+	# socket=gevent.socket.socket()
+	# socket.connect((PARAM.MDS_IP, int(PARAM.MDS_PORT)))
+	# guid=msg.Guid()
+	# guid.a=10
+	# guid.b=22
+	# guid.c=30
+	# guid.d=40
+	# stub=rpc.RpcStub(guid, socket, mds.MDS)
+	# arg=msg.GetChunkServers_Request()
+	# ret=stub.callMethod('GetChunkServers', arg)
 
-	if raw_input('you want to NewChunk ? ')=='y':
-		arg2=msg.NewChunk_Request()
-		arg2.size=32		
-		arg2.count=2
-		ret2=stub2.callMethod('NewChunk', arg2)
-		print ret2.guids
+	# s2=gevent.socket.socket()
+	# s2.connect((ret.random[0].ServiceAddress, ret.random[0].ServicePort))
+	# stub2=rpc.RpcStub(guid, s2, ChunkServer.ChunkServer)
 
-	if raw_input('you want to assembleVolume ? ')=='y':
-		req_assemble = msg.AssembleVolume_Request()
-		req_assemble.volume.size = 32
-		Guid.assign(req_assemble.volume.guid,ret2.guids[-1])
-		res_assemble = stub2.callMethod('AssembleVolume', req_assemble)
-		print 'access_point:', res_assemble.access_point
+	client = Client(PARAM.MDS_IP, int(PARAM.MDS_PORT))
+	serlist = client.mds.GetChunkServers()
+	print len(serlist)
+	print serlist[0].ServiceAddress, serlist[0].ServicePort
 
-	if raw_input('you want to DisassembleVolume ? ')=='y':
-		req_disassemble = msg.DisassembleVolume_Request()
-		req_disassemble.access_point = res_assemble.access_point
-		print 'req_disassemble.access_point:', req_disassemble.access_point
-		stub2.callMethod('DisassembleVolume', req_disassemble)
+	chkaddr = serlist[0].ServiceAddress
+	chkport = serlist[0].ServicePort
+	chkclient = ChunkServerClient(client.guid, chkaddr, chkport)
+	chklist = chkclient.NewChunk(32, 1)
+	print chklist
 
-	if raw_input('you want to DeleteChunk ? ')=='y':
-		arg3=msg.DeleteChunk_Request()
-		t = arg3.guids.add()
-		Guid.assign(t, ret2.guids[0])
-		t = arg3.guids.add()
-		Guid.assign(t, ret2.guids[1])
-		ret_Del=stub2.callMethod('DeleteChunk', arg3)
+
+	volume = Object()
+	volume.size = 50
+	volume.guid = Guid.toStr(chklist.guids[0])
+	target = chkclient.AssembleChunk(volume)
+	print target
+
+	chkclient.DisassembleChunk(target.access_point)
+
+	chkclient.DeleteChunk(volume)
 
 if __name__=='__main__':
+	configuration()
 	test_with_chkserv()
