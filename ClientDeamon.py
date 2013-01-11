@@ -114,12 +114,15 @@ class ClientDeamon:
 
 	def MountVolume(self, req):
 		volume = msg2obj(req.volume)
-		VolumeDict[volume.parameters[0]] = volume
+		volname = volume.parameters[0]
 		ret = MountVolume_Response()
 		ret.error = ''
-		if MountVolumeTree(volume) == False
+		if volname in VolumeDict:
+			ret.error = 'volume {0} is already mounted!'.fromat(volname)
+			return ret
+		VolumeDict[volname] = volume
+		if MountVolumeTree(volume) == False:
 			ret.error = 'mount volume '+volume.parameters[0]+' failed'
-			logging.error(ret.error)
 		return ret
 
 	def MountVolumeTree(self, volume):
@@ -135,9 +138,12 @@ class ClientDeamon:
 			return False
 
 	def UnmountVolume(self, req):
-		del VolumeDict[req.volume_name]
 		ret = msg.UnmountVolume_Response()
 		ret.error = ''
+		if not req.volume_name in VolumeDict:
+			ret.error = 'volume {0} is already unmounted!'.fromat(req.volume_name)
+			return ret
+		del VolumeDict[req.volume_name]
 		if self.DeleteVolumeTree(req.volume_name) == False:
 			ret.error = 'unmount volume {0} failed'.format(req.volume_name)
 		return ret
