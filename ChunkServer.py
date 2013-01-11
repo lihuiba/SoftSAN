@@ -8,7 +8,6 @@ from pytgt.tgt_ctrl import *
 import random
 
 PARAM = None
-
 LVNAME='lv_softsan_'
 VGNAME='VolGroup'
 
