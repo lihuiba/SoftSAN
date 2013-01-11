@@ -8,10 +8,7 @@ import ChunkServer
 from util import *
 import rpc, config
 
-MDS_IP='192.168.0.12'
-MDS_PORT=6789
-CHK_IP='192.168.0.12'
-CHK_PORT=4321
+
 PARAM = None
 
 def splitbyattr(objs, key):
@@ -170,10 +167,6 @@ class MDS:
 		return ret
 
 
-	# def CreateLink(self, arg):
-	#	 ret=msg.CreateLink_Response()
-	#	 return ret
-
 #############################################################################
 
 def buildMDS():
@@ -184,9 +177,7 @@ def buildMDS():
 	server=MDS(tdb, pdb)
 	return server	
 
-def test_main():
-	import gevent.server, rpc
-
+def configuration():
 	global PARAM
 	helpmsg = '''group directories before files.
 				augment with a --sort option, but any
@@ -208,8 +199,10 @@ def test_main():
 	print '----------------',PARAM.MDS_IP
 	print '----------------',PARAM.MDS_PORT
 
-
-
+def test_main():
+	global PARAM
+	import gevent.server, rpc
+	configuration()
 	server=buildMDS()
 	service=rpc.RpcService(server)
 	framework=gevent.server.StreamServer(('0.0.0.0', int(PARAM.MDS_PORT)), service.handler)

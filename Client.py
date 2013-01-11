@@ -449,11 +449,6 @@ def test():
 	#client.DeleteVolume('gfs')
 	client.Clear()
 
-
-
-
-
-# socket.close()
 def configuration():
 	global PARAM
 	helpmsg = '''group directories before files.
@@ -474,7 +469,6 @@ def configuration():
 	default_cfgfile = './test.conf'
 	print '----------------',PARAM.MDS_IP
 	print '----------------',PARAM.MDS_PORT
-
 
 def test_with_chkserv():
 	global PARAM

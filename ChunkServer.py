@@ -76,7 +76,6 @@ class ChunkServer:
 		self.lvm.reload()
 		ret = msg.DeleteChunk_Response()
 		print 'ChunkServer:  DeleteChunk'
-		print req.guids[0]
 		for a_guid in req.guids:
 			str_guid=Guid.toStr(a_guid)
 			lv_name = LVNAME+str_guid
