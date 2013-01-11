@@ -87,13 +87,12 @@ class ChunkServer:
 			Guid.assign(t, a_guid)
 		return ret
 
-def doHeartBeat(server, stub, socket):
-	global LVNAME
+def doHeartBeat(server, chk_port, stub, socket):
 	chunkserver_ip=socket.getsockname()[0]
 	while True:
 		info=msg.ChunkServerInfo()
 		info.ServiceAddress=chunkserver_ip
-		info.ServicePort=int(PARAM.CHK_PORT)
+		info.ServicePort=chk_port
 		server.lvm.reload_softsan_lvs()
 		for lv in server.lvm.softsan_lvs:
 			chk=info.chunks.add()
@@ -104,18 +103,18 @@ def doHeartBeat(server, stub, socket):
 		print 'for test--------------------------------', random.randint(0,100)
 		gevent.sleep(1)
 
-def heartBeat(server):
-	global PARAM
+def heartBeat(*args, **kwargs):
+	
 	guid=Guid.generate()
 	stub=rpc.RpcStub(guid, None, mds.MDS)
 	while True:
 		try:
-			# print '----------------', PARAM.MDS_IP
+			print kwargs['ip'], kwargs['port'], '+========================'
 			# print '________________', PARAM.MDS_PORT
 			socket=gevent.socket.socket()
-			socket.connect((PARAM.MDS_IP, int(PARAM.MDS_PORT)))
+			socket.connect((kwargs['ip'], kwargs['port']))
 			stub.socket=socket
-			doHeartBeat(server, stub, socket)
+			doHeartBeat(kwargs['server'], kwargs['port'], stub, socket)
 		except KeyboardInterrupt:
 			raise
 		except:
@@ -173,11 +172,11 @@ def link_test():
 	PARAM = util.Object(configure)
 	# print PARAM.cfgfile
 	default_cfgfile = './test.conf'
-	print '----------------',PARAM.MDS_IP
+	print '----------------',PARAM.MDS_IP,int(PARAM.MDS_PORT)
 	# print configure
 	server=ChunkServer()
 	logging.basicConfig(level=logging.DEBUG)	
-	gevent.spawn(heartBeat, server)
+	gevent.spawn(heartBeat, server=server, ip=PARAM.MDS_IP, port=int(PARAM.MDS_PORT))
 	service=rpc.RpcService(server)
 	framework=gevent.server.StreamServer(('0.0.0.0',int(PARAM.CHK_PORT)), service.handler)
 	framework.serve_forever()
