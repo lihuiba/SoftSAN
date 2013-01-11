@@ -110,14 +110,16 @@ def isExclusive(args):
 
 def ParseArg(client):
 	cfgfile = './tests.conf'
-	ArgsDict={'create' :['c',  '',       'create a volume'],\
-			  'params' :['p',  '',		 'volume parameters' ],\
-			  'remove' :['r',  '',		 'remove a volume'],\
-			  'info'   :['i',  '',		 'list object information'],\
-			  'split'  :['s',  '',       'split a volume into subvolumes'],\
-			  'mount'  :['m',  '',       'Mount a exist volume'],\
-			  'unmount':['u',  '',	     'Unmount a volume'],\
-			  'cfgfile':['f', cfgfile,   'configuation file of SoftSAN']	}
+	ArgsDict=(\
+		('create',  'c',  '',        'create a volume'),\
+		('params',  'p',  '',		 'volume parameters'),\
+		('remove',  'r',  '',		 'remove a volume'),\
+		('info',    'i',  '',		 'list object information'),\
+		('split',   's',  '',        'split a volume into subvolumes'),\
+		('mount',   'm',  '',        'mount a volume'),\
+		('unmount', 'u',  '',	     'unmount a volume'),\
+		('cfgfile', 'f',  cfgfile,   'configuation file of SoftSAN')\
+	)
 
 	ret, remains = config.config(ArgsDict)
 	args = Object(ret)
@@ -171,7 +173,7 @@ def ParseArg(client):
 	return data
 
 def test():
-	#sys.argv = 'softsan-cli.py --create no1 60 striped 2'.split()
+	sys.argv = 'softsan-cli.py --create no1 60 striped 2'.split()
 	sys.argv = 'softsan-cli.py --mount no1'.split()
 	client = Client.Client('192.168.0.12', 1234)
 	args = ParseArg(client)
