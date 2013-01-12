@@ -29,17 +29,13 @@ message MachineInfo {
     optional string uname_a=5;
 }
 
-message LoadInfo{
-
-}
-
 message ChunkServerInfo {                   //P2S message
     required string ServiceAddress=1;
     required uint32 ServicePort=2;
     optional MachineInfo MachineInfo=3;
-    repeated DiskInfo   =4;
+    repeated DiskInfo diskinfo=4;
     repeated ChunkInfo chunks=5;
-    optional LoadInfo load=6;
+    //optional LoadInfo load=6;
 }
 
 message GetChunkServers_Request {           //P2S message
@@ -193,7 +189,7 @@ message CreateLink_Response {
     optional string error=101;
 }
 
-//client internal connection protocal
+//client internal connection messages
 message MapVolume_Request {
     required Volume volume=1;
 }
