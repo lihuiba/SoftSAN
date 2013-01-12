@@ -8,8 +8,7 @@ options:"""
 
 cfgstruct = (\
 	('address',			'a',	'0.0.0.0',	'ip address to bind'), \
-	('port',			'p',	0x6789,		'tcp port to bind'), \
-	('rootpath',		'r',	None,		'root path for serving meta data'),\
+	('port',			'p',	0x26505, 'root path for serving meta data'),\
 	('logging-level',	'l',	'info',		'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
 	('config',			'c',	'mds.conf',	'config file'),\
 	('help',			'h',	False,		'this help'),\

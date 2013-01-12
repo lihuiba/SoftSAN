@@ -8,6 +8,7 @@ import block.dm as dm
 from mds import Object
 import libiscsi
 import scandev
+import config,util
 
 def configuration():
 	global PARAM
@@ -35,42 +36,43 @@ def test_with_chkserv():
 	global PARAM
 
 	# logging.basicConfig(level=logging.DEBUG)
-	# socket=gevent.socket.socket()
-	# socket.connect((PARAM.MDS_IP, int(PARAM.MDS_PORT)))
+	# s1=gevent.socket.socket()
+	# s1.connect((PARAM.MDS_IP, int(PARAM.MDS_PORT)))
 	# guid=msg.Guid()
 	# guid.a=10
 	# guid.b=22
 	# guid.c=30
 	# guid.d=40
-	# stub=rpc.RpcStub(guid, socket, mds.MDS)
+	# stub=rpc.RpcStub(guid, s1, mds.MDS)
 	# arg=msg.GetChunkServers_Request()
 	# ret=stub.callMethod('GetChunkServers', arg)
 
 	# s2=gevent.socket.socket()
 	# s2.connect((ret.random[0].ServiceAddress, ret.random[0].ServicePort))
 	# stub2=rpc.RpcStub(guid, s2, ChunkServer.ChunkServer)
-
-	client = Client(PARAM.MDS_IP, int(PARAM.MDS_PORT))
+	mdsip='192.168.0.149'
+	mdsport='6789'
+	client = Client.Client(PARAM.MDS_IP, int(PARAM.MDS_PORT))
 	serlist = client.mds.GetChunkServers()
 	print len(serlist)
 	print serlist[0].ServiceAddress, serlist[0].ServicePort
 
-	chkaddr = serlist[0].ServiceAddress
-	chkport = serlist[0].ServicePort
-	chkclient = ChunkServerClient(client.guid, chkaddr, chkport)
-	chklist = chkclient.NewChunk(32, 1)
-	print chklist
+	# chkaddr = serlist[0].ServiceAddress
+	# chkport = serlist[0].ServicePort
+	# chkclient = ChunkServerClient(client.guid, chkaddr, chkport)
+	# chklist = chkclient.NewChunk(32, 1)
+	# print chklist
 
 
-	volume = Object()
-	volume.size = 50
-	volume.guid = Guid.toStr(chklist.guids[0])
-	target = chkclient.AssembleChunk(volume)
-	print target
+	# volume = Object()
+	# volume.size = 50
+	# volume.guid = Guid.toStr(chklist.guids[0])
+	# target = chkclient.AssembleChunk(volume)
+	# print target
 
-	chkclient.DisassembleChunk(target.access_point)
+	# chkclient.DisassembleChunk(target.access_point)
 
-	chkclient.DeleteChunk(volume)
+	# chkclient.DeleteChunk(volume)
 
 if __name__=='__main__':
 	configuration()

@@ -1,6 +1,5 @@
 import rpc, logging, sys
 import messages_pb2 as msg
-import client_messages_pb2 as clmsg
 import mds, ChunkServer
 import gevent.socket
 import guid as Guid
@@ -14,7 +13,6 @@ from util import object2message as obj2msg
 from util import Pool
 from collections import Iterable
 import util, config
-
 
 Mds_IP = '192.168.0.149'
 Mds_Port = 1234
@@ -452,7 +450,6 @@ def test():
 	client.Clear()
 
 
-# socket.close()
 def configuration():
 	global PARAM
 	helpmsg = '''group directories before files.
@@ -473,7 +470,6 @@ def configuration():
 	default_cfgfile = './test.conf'
 	print '----------------',PARAM.MDS_IP
 	print '----------------',PARAM.MDS_PORT
-
 
 def test_with_chkserv():
 	global PARAM

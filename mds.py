@@ -164,10 +164,6 @@ class MDS:
 		return ret
 
 
-	# def CreateLink(self, arg):
-	#	 ret=msg.CreateLink_Response()
-	#	 return ret
-
 #############################################################################
 
 def buildMDS():
