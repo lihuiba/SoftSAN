@@ -1,5 +1,4 @@
 import getopt, sys
-import getopt, sys
 import ConfigParser, string
 
 def config(cfgstruct, cfgfile='cfgfile'):

@@ -1,6 +1,5 @@
 import rpc, logging, sys
 import messages_pb2 as msg
-import client_messages_pb2 as clmsg
 import mds, ChunkServer
 import gevent.socket
 import guid as Guid
@@ -15,9 +14,9 @@ from util import Pool
 from collections import Iterable
 import util, config
 
+Mds_IP = '192.168.0.149'
+Mds_Port = 1234
 
-Mds_IP = '192.168.0.12'
-Mds_Port = 6789
 Client_IP = '192.168.0.12'
 Client_Port = 6767
 CHUNKSIZE = 64
@@ -465,6 +464,7 @@ def test():
 
 	#client.DeleteVolume('gfs')
 	client.Clear()
+
 
 if __name__=='__main__':
 	test()

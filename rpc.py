@@ -126,6 +126,7 @@ class RpcStub:
 		else:
 			self.methodInfo=BuildMethodInfo(Interface)
 		logging.info(self.methodInfo.keys())
+		
 	def callMethod(self, name, argument, socket=None):
 		MI=self.methodInfo[name]
 		assert type(argument)==MI[0]
@@ -141,7 +142,6 @@ class RpcStub:
 		assert name_==name
 		self.token=token+1
 		ret=MI[1].FromString(body_)
-
 		return ret
 
 

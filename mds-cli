@@ -1,0 +1,47 @@
+#!/usr/bin/python
+import mds, persistentdb, transientdb, gevent.server, rpc
+import logging, config, util, sys, os.path
+
+header="""Meta-Data Server of SoftSAN
+Usage: mds-cli [options]
+options:"""
+
+cfgstruct = (\
+	('address',			'a',	'0.0.0.0',	'ip address to bind'), \
+	('port',			'p',	0x26505, 'root path for serving meta data'),\
+	('logging-level',	'l',	'info',		'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
+	('config',			'c',	'mds.conf',	'config file'),\
+	('help',			'h',	False,		'this help'),\
+)
+
+try:
+	configure,_ = config.config(cfgstruct, 'config')
+except:
+	pass
+
+if configure['help']==True:
+	print header
+	config.usage_print(cfgstruct)
+	exit(0)
+
+loglevel=configure['logging-level']
+if not loglevel in util.str2logginglevel:
+	print >>sys.stderr, 'invalid logging level "{0}"'.format(level)
+	exit(-1)
+loglevel=util.str2logginglevel[loglevel]
+logging.basicConfig(level=loglevel)
+
+rootpath=configure['rootpath']
+if not rootpath:
+	print >>sys.stderr, 'the rootpath option must be specified'
+	exit(-1)
+if not os.path.exists(rootpath):
+	print >>sys.stderr, 'the rootpath "{0}"" must exists'.format(rootpath)
+	exit(-1)
+pdb=persistentdb.PersistentDB(rootpath)
+tdb=transientdb.TransientDB()
+server=mds.MDS(tdb, pdb)
+service=rpc.RpcService(server)
+endpoint=(configure['address'], int(configure['port']))
+framework=gevent.server.StreamServer(endpoint, service.handler)
+framework.serve_forever()

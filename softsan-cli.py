@@ -169,6 +169,7 @@ def ParseArg(client):
 			return None
 
 	getattr(client, func+'Volume')(data)
+	client.Clear()
 	return data
 
 def test():
