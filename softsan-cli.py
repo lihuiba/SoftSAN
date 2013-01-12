@@ -109,22 +109,21 @@ def isExclusive(args):
 	return True
 
 def ParseArg(client):
-	cfgfile = './tests.conf'
 	ArgsDict=(\
-		('create',  'c',  '',        'create a volume'),\
-		('params',  'p',  '',		 'volume parameters'),\
-		('remove',  'r',  '',		 'remove a volume'),\
-		('info',    'i',  '',		 'list object information'),\
-		('split',   's',  '',        'split a volume into subvolumes'),\
-		('mount',   'm',  '',        'mount a volume'),\
-		('unmount', 'u',  '',	     'unmount a volume'),\
-		('cfgfile', 'f',  cfgfile,   'configuation file of SoftSAN')\
+		('create',  'c',  '',        		'create a volume'),\
+		('params',  'p',  '',		 		'volume parameters'),\
+		('remove',  'r',  '',				'remove a volume'),\
+		('info',    'i',  '',		 		'list object information'),\
+		('split',   's',  '',       		'split a volume into subvolumes'),\
+		('mount',   'm',  '',        		'mount a volume'),\
+		('unmount', 'u',  '',	     		'unmount a volume'),\
+		('cfgfile', 'f',  './tests.conf',   'configuation file of SoftSAN')\
 	)
 
 	ret, remains = config.config(ArgsDict)
 	args = Object(ret)
 
-	if not isExclusive():
+	if not isExclusive(args):
 		print 'Invalid argument'
 
 	print remains
@@ -158,7 +157,7 @@ def ParseArg(client):
 		data = args.mount
 		func = 'Mount'
 	if args.unmount != '':
-		name = args.unmount
+		data = args.unmount
 		func = 'Unmount'
 	if isinstance(data,str):
 		if len(remains)>0:
@@ -174,8 +173,11 @@ def ParseArg(client):
 
 def test():
 	sys.argv = 'softsan-cli.py --create no1 60 striped 2'.split()
+	sys.argv = 'softsan-cli.py --info no1'.split()
+	sys.argv = 'softsan-cli.py --unmount no1'.split()
 	sys.argv = 'softsan-cli.py --mount no1'.split()
-	client = Client.Client('192.168.0.12', 1234)
+	sys.argv = 'softsan-cli.py --remove no1'.split()
+	client = Client.Client('192.168.0.12', 6789)
 	args = ParseArg(client)
 	if isinstance(args, Object):
 		print args.name
