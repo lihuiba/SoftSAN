@@ -9,9 +9,7 @@ import libiscsi
 import scandev
 
 Client_IP = '192.168.0.12'
-Mds_IP = '192.168.0.12'
-Client_Port = 6789
-Mds_Port = 1234
+Client_Port = 6767
 
 VolumeDict = {}
 
@@ -89,13 +87,15 @@ class ClientDeamon:
 			result = self.MapGFSVolume(volumename, req.volume.subvolumes)
 
 		ret = msg.MapVolume_Response()
+		ret.error = ''
 		if result == False:
 			ret.error = 'device mapper: Mapping volume failed'
 			logging.error(ret.error)
 			return ret
 
 		VolumeDict[volumename] = req.volume
-		ret.error = ''
+		for subvol in req.volume.subvolumes:
+			VolumeDict[subvol.parameters[0]] = subvol
 		return ret
 
 	def SplitVolume(self, req):
@@ -109,41 +109,41 @@ class ClientDeamon:
 					mp.remove()
 		except:
 			ret.error = 'split volume failed'
-	
 		return ret
 
 	def MountVolume(self, req):
-		volume = msg2obj(req.volume)
-		volname = volume.parameters[0]
-		ret = MountVolume_Response()
+		volname = req.volume.parameters[0]
+		ret = msg.MountVolume_Response()
 		ret.error = ''
 		if volname in VolumeDict:
 			ret.error = 'volume {0} is already mounted!'.fromat(volname)
 			return ret
-		VolumeDict[volname] = volume
-		if MountVolumeTree(volume) == False:
-			ret.error = 'mount volume '+volume.parameters[0]+' failed'
+		if self.MountVolumeTree(req.volume) == False:
+			ret.error = 'mount volume '+volname+' failed'
+			return ret
+		VolumeDict[volname] = req.volume
 		return ret
 
 	def MountVolumeTree(self, volume):
+		volname = volume.parameters[0]
 		if volume.assembler == 'chunk':
+			VolumeDict[volname] = volume
 			return True
 		for vol in volume.subvolumes:
-			if self.MountVolume(vol) == False:
+			if self.MountVolumeTree(vol) == False:
 				return False
+		VolumeDict[volname] = volume
 		req = Object()
 		req.volume = volume
-		ret = self.MapVolume(req)
-		if ret.error != '':
-			return False
+		self.MapVolume(req)
+		return True
 
 	def UnmountVolume(self, req):
 		ret = msg.UnmountVolume_Response()
 		ret.error = ''
 		if not req.volume_name in VolumeDict:
-			ret.error = 'volume {0} is already unmounted!'.fromat(req.volume_name)
+			ret.error = 'volume {0} is already unmounted!'.format(req.volume_name)
 			return ret
-		del VolumeDict[req.volume_name]
 		if self.DeleteVolumeTree(req.volume_name) == False:
 			ret.error = 'unmount volume {0} failed'.format(req.volume_name)
 		return ret
@@ -163,13 +163,12 @@ class ClientDeamon:
 		return ret
 
 	def DeleteVolumeTree(self, volume):
-		if isinstance(volume, str):
-			if volume in VolumeDict:
-				volume = VolumeDict[volume]
-			else:
-				return False
-		del VolumeDict[volume.parameters[0]]
+		if volume in VolumeDict:
+			volume = VolumeDict[volume]
+		else:
+			return False
 		if volume.assembler == 'chunk':
+			del VolumeDict[volume.parameters[0]]
 			return True
 		try:
 			mps = dm.maps()
@@ -181,8 +180,9 @@ class ClientDeamon:
 			logging.error('device mapper: removing map failed')
 			return False
 		for subvolume in volume.subvolumes:
-			if self.DeleteVolumeTree(subvolume) == False:
+			if self.DeleteVolumeTree(subvolume.parameters[0]) == False:
 				return False
+		del VolumeDict[volume.parameters[0]]
 		return True
 
 
