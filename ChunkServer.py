@@ -181,6 +181,11 @@ def link_test():
 	framework=gevent.server.StreamServer(('0.0.0.0',int(PARAM.CHK_PORT)), service.handler)
 	framework.serve_forever()
 
+def main():
+	#cfgstruct=(...)
+	#mdsaddress, mdsport, address, port, lvmgroup, lvprefix, config, logging-level, help
+	#remove globals as much as possible
+
 
 
 if __name__=='__main__':
