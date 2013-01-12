@@ -110,7 +110,7 @@ def isExclusive(args):
 
 def ParseArg(client):
 	cfgfile = './tests.conf'
-	ArgsDict=(\
+	commands=(\
 		('create',  'c',  '',        'create a volume'),\
 		('params',  'p',  '',		 'volume parameters'),\
 		('remove',  'r',  '',		 'remove a volume'),\
@@ -118,11 +118,22 @@ def ParseArg(client):
 		('split',   's',  '',        'split a volume into subvolumes'),\
 		('mount',   'm',  '',        'mount a volume'),\
 		('unmount', 'u',  '',	     'unmount a volume'),\
-		('cfgfile', 'f',  cfgfile,   'configuation file of SoftSAN')\
+		('help',	'h',  False,	'this help'),\
 	)
 
-	ret, remains = config.config(ArgsDict)
-	args = Object(ret)
+	argstruct=(\
+		('mdsaddress',		'a',		'',					'...'),\
+		('mdsport',			'p',		0x6789,				'....'),\
+		('logging-level',	'l',		'info',				'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
+		('config',			'c',		'softsan-cli.conf',	'config file'),\
+	)
+
+	config,_ = config.config(argstruct, 'config')
+	#process config
+	#...
+
+	cmds, remains = config.config(commands, None)
+	args = Object(cmds)
 
 	if not isExclusive():
 		print 'Invalid argument'
