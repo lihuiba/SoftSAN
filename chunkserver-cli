@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import ChunkServer, gevent.server, rpc, gevent
 import logging, config, util, sys, os.path
 
@@ -7,16 +8,20 @@ options:"""
 
 cfgstruct = (\
 	('address',			'a',	'0.0.0.0',	'ip address to bind'), \
-	('chk_port',			'p',	'1821',		'tcp port to bind'), \
+	('chk_port',		'p',	0x2121,		'tcp port to bind'), \
 	('mds_ip',			'M',	'192.168.0.149',	'mds ip address'), \
-	('mds_port',		'm',	'6789',		'mds port'), \
+	('mds_port',		'm',	0x6789,		'mds port'), \
+	('vg',				'x',	'VolGroup',	'name of volume group'),\
+	('volprefix',		'z',	'lv_softsan_',	'prefix of volume name'),\
 	('logging-level',	'l',	'info',		'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
 	('config',			'c',	'./Chunkserver.conf',	'config file'),\
 	('help',			'h',	False,		'this help'),\
+
 )
 
 try:
 	configure,_ = config.config(cfgstruct, 'config')
+	confobj = util.Object(configure)
 except:
 	pass
 
@@ -32,7 +37,7 @@ if not loglevel in util.str2logginglevel:
 loglevel=util.str2logginglevel[loglevel]
 logging.basicConfig(level=loglevel)
 server=ChunkServer.ChunkServer()
-gevent.spawn(ChunkServer.heartBeat, server=server, mds_ip=configure['mds_ip'], mds_port=int(configure['mds_port']), chk_port=int(configure['chk_port']))
+gevent.spawn(server.heartBeat, confobj)
 service=rpc.RpcService(server)
-framework=gevent.server.StreamServer((configure['address'],int(configure['chk_port'])), service.handler)
+framework=gevent.server.StreamServer((configure['address'], int(configure['chk_port'])), service.handler)
 framework.serve_forever()
