@@ -88,12 +88,15 @@ class ChunkServer:
 		return ret
 
 def doHeartBeat(server, chk_port, stub, socket):
+	
 	chunkserver_ip=socket.getsockname()[0]
+	print socket.getsockname()
 	while True:
 		info=msg.ChunkServerInfo()
 		info.ServiceAddress=chunkserver_ip
 		info.ServicePort=chk_port
 		server.lvm.reload_softsan_lvs()
+
 		for lv in server.lvm.softsan_lvs:
 			chk=info.chunks.add()
 			name4guid = lv.name.split(LVNAME)[1]
@@ -103,18 +106,28 @@ def doHeartBeat(server, chk_port, stub, socket):
 		print 'for test--------------------------------', random.randint(0,100)
 		gevent.sleep(1)
 
-def heartBeat(*args, **kwargs):
-	
+def heartBeat(server, *args, **kwargs):
+
+	if kwargs.has_key('mds_ip'):
+		mds_ip = kwargs['mds_ip']
+	else:
+		mds_ip = '127.0.0.1'
+	if kwargs.has_key('mds_port'):
+		mds_port = kwargs['mds_port']
+	else:
+		mds_port = 0x8000
+	if kwargs.has_key('chk_port'):
+		chk_port = kwargs['chk_port']
+	else:
+		chk_port = 0x8001
 	guid=Guid.generate()
 	stub=rpc.RpcStub(guid, None, mds.MDS)
 	while True:
 		try:
-			print kwargs['ip'], kwargs['port'], '+========================'
-			# print '________________', PARAM.MDS_PORT
 			socket=gevent.socket.socket()
-			socket.connect((kwargs['ip'], kwargs['port']))
+			socket.connect((mds_ip, mds_port))
 			stub.socket=socket
-			doHeartBeat(kwargs['server'], kwargs['port'], stub, socket)
+			doHeartBeat(server, chk_port, stub, socket)
 		except KeyboardInterrupt:
 			raise
 		except:
@@ -160,26 +173,29 @@ def link_test():
 				use of --sort=none (-U) disables grouping
 			  '''
 	default_cfgfile = './test.conf'
-
 	cfgdict = (('MDS_IP', 'M', '192.168.0.149', 'ip address of metadata server'), \
 				('MDS_PORT','m','6789','port of metadata server'), \
 				('CHK_IP','C', '192.168.0.149', helpmsg), \
 				('CHK_PORT','c', '3456', 'the port of chunk server'),\
 				('enablexxx','x',False,'enable x'),\
 				('cfgfile','f', default_cfgfile, 'name of the configuration file'))
-
 	configure,_ = config.config(cfgdict)
 	PARAM = util.Object(configure)
 	# print PARAM.cfgfile
 	default_cfgfile = './test.conf'
-	print '----------------',PARAM.MDS_IP,int(PARAM.MDS_PORT)
+	print '----------------',PARAM.MDS_IP, int(PARAM.MDS_PORT)
 	# print configure
-	server=ChunkServer()
+	chkserver=ChunkServer()
 	logging.basicConfig(level=logging.DEBUG)	
-	gevent.spawn(heartBeat, server=server, ip=PARAM.MDS_IP, port=int(PARAM.MDS_PORT))
-	service=rpc.RpcService(server)
+	gevent.spawn(heartBeat, server=chkserver, mds_ip=PARAM.MDS_IP, mds_port=int(PARAM.MDS_PORT), chk_port=int(PARAM.CHK_PORT))
+	service=rpc.RpcService(chkserver)
 	framework=gevent.server.StreamServer(('0.0.0.0',int(PARAM.CHK_PORT)), service.handler)
 	framework.serve_forever()
+
+def main():
+	#cfgstruct=(...)
+	#mdsaddress, mdsport, address, port, lvmgroup, lvprefix, config, logging-level, help
+	#remove globals as much as possible
 
 
 

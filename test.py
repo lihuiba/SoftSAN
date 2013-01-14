@@ -37,6 +37,14 @@ def test_dir():
 	o = myclass(1)
 	print dir()
 	print dir(o)
+	dic = {}
+	dic['name'] = 'mingtai'
+	dic['date'] = '2013-01-09'
+	dic['weather'] = 'snow'
+	print dic
+	if dic.has_key('date'):
+		print 'has key %s' %('date')
+	
 
 def test(*args, **kwargs):
 	print args
@@ -45,7 +53,7 @@ def test(*args, **kwargs):
 
 
 if __name__ == '__main__':
-	test(1,2,asdfa='a',b='b')
+	test_dir()
 	
 	
 

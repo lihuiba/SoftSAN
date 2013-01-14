@@ -8,9 +8,6 @@ from mds import Object
 import libiscsi
 import scandev
 
-Client_IP = '192.168.0.12'
-Client_Port = 6767
-
 VolumeDict = {}
 
 class ClientDeamon:
@@ -26,7 +23,8 @@ class ClientDeamon:
 			start += size
 		try:
 			dm.map(volumename, tblist)
-		except:
+		except Exception as ex:
+			logging.error(str(ex))
 			return False
 		return True
 
@@ -43,7 +41,8 @@ class ClientDeamon:
 		tblist.append(table)
 		try:
 			dm.map(volumename, tblist)
-		except:
+		except Exception as ex:
+			logging.error(str(ex))
 			return False
 		return True
 
@@ -64,7 +63,8 @@ class ClientDeamon:
 			i += 3
 		try:
 			dm.map(volumename, tblist)
-		except:
+		except Exception as ex:
+			logging.error(str(ex))
 			return False
 		return True
 
@@ -73,13 +73,13 @@ class ClientDeamon:
 		size = req.volume.size
 		dmtype = req.volume.assembler
 
-		logging.debug('Mapping volume:', req.volume.parameters[0])
+		logging.info('Mapping volume:', req.volume.parameters[0])
 
 		if dmtype == 'linear':
 			result = self.MapLinearVolume(volumename, req.volume.subvolumes)
 		elif dmtype == 'striped':
-			if len(req.volume.parameters) > 4:
-				stripedsize = int(req.volume.parameters[4])
+			if len(req.volume.parameters) > 3:
+				stripedsize = int(req.volume.parameters[3])
 			else:
 				stripedsize = 256
 			result = self.MapStripedVolume(volumename, stripedsize, req.volume.subvolumes)
@@ -89,7 +89,7 @@ class ClientDeamon:
 		ret = msg.MapVolume_Response()
 		ret.error = ''
 		if result == False:
-			ret.error = 'device mapper: Mapping volume failed'
+			ret.error = 'device mapper: map volume {0} failed'.format(volumename)
 			logging.error(ret.error)
 			return ret
 
@@ -99,7 +99,6 @@ class ClientDeamon:
 		return ret
 
 	def SplitVolume(self, req):
-		del VolumeDict[req.volume_name]
 		ret = msg.UnmapVolume_Response()
 		ret.error = ''
 		try:
@@ -107,8 +106,10 @@ class ClientDeamon:
 			for mp in maps:
 				if mp.name == req.volume_name:
 					mp.remove()
-		except:
-			ret.error = 'split volume failed'
+		except Exception as ex:
+			logging.error('device mapper: split volume {0} failed'.format(req.volume_name))
+			logging.error(str(ex))
+		del VolumeDict[req.volume_name]
 		return ret
 
 	def MountVolume(self, req):
@@ -176,8 +177,9 @@ class ClientDeamon:
 			for mp in mps:
 				if name == mp.name:
 					mp.remove()
-		except:
-			logging.error('device mapper: removing map failed')
+		except Exception as ex:
+			logging.error('device mapper: removing volume {0} failed'.format(volume.parameters[0]))
+			logging.error(str(ex))
 			return False
 		for subvolume in volume.subvolumes:
 			if self.DeleteVolumeTree(subvolume.parameters[0]) == False:
@@ -191,5 +193,5 @@ if __name__=='__main__':
 
 	server=ClientDeamon()
 	service=rpc.RpcService(server)
-	framework=gevent.server.StreamServer(('0.0.0.0', Client_Port), service.handler)
+	framework=gevent.server.StreamServer(('0.0.0.0', 6767), service.handler)
 	framework.serve_forever()
