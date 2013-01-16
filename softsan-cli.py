@@ -19,11 +19,11 @@ def ParseTable(words):
 	num = len(words)
 	argc = 0
 	if num < 2:
-		print 'Too few arguments'
-		return None
+		print >>sys.stderr, 'Too few table arguments'
+		exit(-1)
 	if isinstance(words[0], str)==False or words[1].isdigit()==False:
-		print tableFormat
-		return None
+		print >>sys.stderr, 'incorrect table format'
+		exit(-1)
 	arg.name = words[0]
 	arg.size = int(words[1])
 	argc += 2
@@ -39,8 +39,8 @@ def ParseTable(words):
 			arg.type = 'gfs'
 			return arg
 		else:
-			print 'Unrecognized argument: ' + words[argc]
-			return None
+			print >>sys.stderr, 'Unrecognized argument: ' + words[argc]
+			exit(-1)
 		argc += 1
 		if argc >= num:
 			return arg
@@ -50,8 +50,8 @@ def ParseTable(words):
 		if argc >= num:
 			chksize = arg.size/num_vol
 			if chksize < 4:
-				print 'chunk size too samll'
-				return None
+				print >>sys.stderr, 'too many chunks or chunk size too samll'
+				exit(-1)
 			totsize = arg.size
 			while totsize > chksize:
 				arg.chunksizes.append(chksize)
@@ -65,8 +65,8 @@ def ParseTable(words):
 				arg.chunksizes.append(int(words[i]))
 				totsize += int(words[i])
 			if totsize > arg.size:
-				print 'total chunk size summary is larger than the size you specifed'
-				return None
+				print >>sys.stderr, 'chunk size summary is larger than voluem size'
+				exit(-1)
 			remain = arg.size-totsize
 			while remain > CHUNKSIZE:
 				arg.chunksizes.append(CHUNKSIZE)
@@ -76,7 +76,8 @@ def ParseTable(words):
 			return arg
 		else:
 			if num-argc != num_vol:
-				return None
+				print >>sys.stderr, 'there are {0} volumes given'.format(num-argc)
+				exit(-1)
 			for i in range(argc, num):
 				arg.subvolumes.append(words[i])
 			return arg
@@ -109,8 +110,6 @@ def isExclusive(args):
 	return True
 
 def ParseArg(client):
-<<<<<<< HEAD
-	cfgfile = './tests.conf'
 	commands=(\
 		('create',  'c',  '',        'create a volume'),\
 		('params',  'p',  '',		 'volume parameters'),\
@@ -119,69 +118,66 @@ def ParseArg(client):
 		('split',   's',  '',        'split a volume into subvolumes'),\
 		('mount',   'm',  '',        'mount a volume'),\
 		('unmount', 'u',  '',	     'unmount a volume'),\
-		('help',	'h',  False,	'this help'),\
-=======
-	ArgsDict=(\
-		('create',  'c',  '',        		'create a volume'),\
-		('params',  'p',  '',		 		'volume parameters'),\
-		('remove',  'r',  '',				'remove a volume'),\
-		('info',    'i',  '',		 		'list object information'),\
-		('split',   's',  '',       		'split a volume into subvolumes'),\
-		('mount',   'm',  '',        		'mount a volume'),\
-		('unmount', 'u',  '',	     		'unmount a volume'),\
-		('cfgfile', 'f',  './tests.conf',   'configuation file of SoftSAN')\
->>>>>>> 4aa699c83586095d0cc715fec3047d47c0eefe85
+		('help',	'h',  False,	 'this help')
 	)
 
 	argstruct=(\
-		('mdsaddress',		'a',		'',					'...'),\
-		('mdsport',			'p',		0x6789,				'....'),\
+		('mdsaddress',		'a',		'',					'metadata server address'),\
+		('mdsport',			'p',		0x6789,				'metadata server port'),\
 		('logging-level',	'l',		'info',				'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
 		('config',			'c',		'softsan-cli.conf',	'config file'),\
 	)
 
-	config,_ = config.config(argstruct, 'config')
-	#process config
-	#...
-
+	config,_ = config.config(argstruct, 'softsan-cli.conf')
+	if config['mdsaddress'] != True:
+		print >>sys.stderr,  'must specifiy metadata server address first'
+		exit(-1)
+	if config['mdsport'] != True:
+		print >>sys.stderr, 'must specifiy metadata server port first'
+		exit(-1)
+	if not config['logging-level'] in util.str2logginglevel:
+		print >>sys.stderr, 'invalid logging level "{0}"'.format(level)
+		exit(-1)
+	
 	cmds, remains = config.config(commands, None)
-	args = Object(cmds)
+	cmds = Object(cmds)
 
-	if not isExclusive(args):
-		print 'Invalid argument'
+	if not isExclusive(cmds):
+		print >>sys.stderr, 'Invalid argument'
+		exit(-1)
 
 	print remains
-	print args.params
+	print cmds.params
 
-	if args.create != '':
-		name = args.create
+	if cmds.create != '':
+		name = cmds.create
 		words = [name]
 		words.extend(remains)
 		data = ParseTable(words)
 		if isinstance(data, Object) == False:
 			print 'table format error'
 			return None
-		if args.params:
-			strsize = int(args.params)
+		if cmds.params:
+			strsize = int(cmds.params)
 			if strsize != 256 and strsize != 512 and strsize != 1024 and strsize != 2048:
 				print 'stripe size only can be: 256/512/1024/2048'
 				return None
-			data.parameters.append(args.params)
+			data.parameters.append(cmds.params)
 		func = 'Create'
-	if args.remove != '':
-		data = args.remove
+	if cmds.remove != '':
+		data = cmds.remove
 		func = 'Delete'
-	if args.info != '':
-		data = args.info
+	if cmds.info != '':
+		data = cmds.info
 		func = 'Info'
-	if args.split != '':
-		data = args.split
+	if cmds.split != '':
+		data = cmds.split
 		func = 'Split'
-	if args.mount != '':
-		data = args.mount
+	if cmds.mount != '':
+		data = cmds.mount
 		func = 'Mount'
-	if args.unmount != '':
-		data = args.unmount
+	if cmds.unmount != '':
+		data = cmds.unmount
 		func = 'Unmount'
 	if isinstance(data,str):
 		if len(remains)>0:
@@ -193,6 +189,7 @@ def ParseArg(client):
 			return None
 
 	getattr(client, func+'Volume')(data)
+	client.Clear()
 	return data
 
 def test():

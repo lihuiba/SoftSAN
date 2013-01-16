@@ -7,21 +7,20 @@ import Backend
 from pytgt.tgt_ctrl import *
 import random
 
-PARAM = None
-LVNAME='lv_softsan_'
-VGNAME='VolGroup'
 
 class ChunkServer:
-	def __init__(self):
+	def __init__(self, prefix_vol='lv_softsan_', vgname='VolGroup'):
 		self.lvm = Backend.LVM_SOFTSAN()
 		self.tgt = Tgt()
+		self.prefix_vol = prefix_vol
+		self.vgname = vgname
 	
 #  always use lun_index=1. 
 	def AssembleVolume(self, req):
 		self.tgt.reload()
 		ret = msg.AssembleVolume_Response()
 		str_guid = Guid.toStr(req.volume.guid)
-		lv_name = LVNAME+str_guid
+		lv_name = self.prefix_vol+str_guid
 		if not self.lvm.haslv(lv_name):
 			ret.error = "Chunk {0} does not exist!".format(str_guid)
 			return ret
@@ -34,7 +33,7 @@ class ChunkServer:
 			target_id = str(random.randint(0,1024*1024))
 			if not self.tgt.is_in_targetlist(target_id): 
 				break			
-		lun_path = '/dev/'+VGNAME+'/'+lv_name
+		lun_path = '/dev/'+self.vgname+'/'+lv_name
 		if self.tgt.new_target_lun(target_id, target_name, lun_path, 'ALL')!=None:
 			ret.error = "Failed to export chunk {0} with tgt".format(str_guid)
 			return ret
@@ -60,9 +59,9 @@ class ChunkServer:
 		size = str(req.size)+'M'
 		for i in range(req.count):
 			a_guid = Guid.generate()
-			lv_name = LVNAME+Guid.toStr(a_guid)
+			lv_name = self.prefix_vol+Guid.toStr(a_guid)
 			lv_size = size
-			output =  self.lvm.lv_create(VGNAME, lv_name, lv_size)
+			output =  self.lvm.lv_create(self.vgname, lv_name, lv_size)
 			if output!=None:
 				ret.error = str(i) + ':' + output + ' '
 				break
@@ -77,8 +76,8 @@ class ChunkServer:
 		print 'ChunkServer:  DeleteChunk'
 		for a_guid in req.guids:
 			str_guid=Guid.toStr(a_guid)
-			lv_name = LVNAME+str_guid
-			lv_path = '/dev/'+VGNAME+'/'+lv_name
+			lv_name = self.prefix_vol+str_guid
+			lv_path = '/dev/'+self.vgname+'/'+lv_name
 			output = self.lvm.lv_remove(lv_path)
 			if output!=None:
 				ret.error = "Unable to delete chunk {0}:\n{1}".format(str_guid, output)
@@ -87,52 +86,39 @@ class ChunkServer:
 			Guid.assign(t, a_guid)
 		return ret
 
-def doHeartBeat(server, chk_port, stub, socket):
-	
-	chunkserver_ip=socket.getsockname()[0]
-	print socket.getsockname()
-	while True:
-		info=msg.ChunkServerInfo()
-		info.ServiceAddress=chunkserver_ip
-		info.ServicePort=chk_port
-		server.lvm.reload_softsan_lvs()
+	def doHeartBeat(self, chk_port, stub, socket):
+		chunkserver_ip=socket.getsockname()[0]
+		while True:
+			info=msg.ChunkServerInfo()
+			info.ServiceAddress=chunkserver_ip
+			info.ServicePort=chk_port
+			self.lvm.reload_softsan_lvs()
+			for lv in self.lvm.softsan_lvs:
+				chk=info.chunks.add()
+				name4guid = lv.name.split(self.prefix_vol)[1]
+				Guid.assign(chk.guid, Guid.fromStr(name4guid))
+				chk.size = int(lv.get_sizes(lv.total_extents)[2])
+			stub.callMethod('ChunkServerInfo', info)
+			print 'for test--------------------------------', random.randint(0,100)
+			gevent.sleep(1)
 
-		for lv in server.lvm.softsan_lvs:
-			chk=info.chunks.add()
-			name4guid = lv.name.split(LVNAME)[1]
-			Guid.assign(chk.guid, Guid.fromStr(name4guid))
-			chk.size = int(lv.get_sizes(lv.total_extents)[2])
-		stub.callMethod('ChunkServerInfo', info)
-		print 'for test--------------------------------', random.randint(0,100)
-		gevent.sleep(1)
+	def heartBeat(self, confobj):
+		guid=Guid.generate()
+		stub=rpc.RpcStub(guid, None, mds.MDS)
 
-def heartBeat(server, *args, **kwargs):
-
-	if kwargs.has_key('mds_ip'):
-		mds_ip = kwargs['mds_ip']
-	else:
-		mds_ip = '127.0.0.1'
-	if kwargs.has_key('mds_port'):
-		mds_port = kwargs['mds_port']
-	else:
-		mds_port = 0x8000
-	if kwargs.has_key('chk_port'):
-		chk_port = kwargs['chk_port']
-	else:
-		chk_port = 0x8001
-	guid=Guid.generate()
-	stub=rpc.RpcStub(guid, None, mds.MDS)
-	while True:
-		try:
-			socket=gevent.socket.socket()
-			socket.connect((mds_ip, mds_port))
-			stub.socket=socket
-			doHeartBeat(server, chk_port, stub, socket)
-		except KeyboardInterrupt:
-			raise
-		except:
-			logging.debug('An error occured during heart beat, preparing to retry', exc_info=1)
-			gevent.sleep(2)
+		while True:
+			try:
+				socket=gevent.socket.socket()
+				# print (confobj.mds_ip, int(confobj.mds_port))
+				socket.connect((confobj.mds_ip, int(confobj.mds_port)))
+				
+				stub.socket=socket
+				self.doHeartBeat(int(confobj.chk_port), stub, socket)
+			except KeyboardInterrupt:
+				raise
+			except:
+				logging.debug('An error occured during heart beat, preparing to retry', exc_info=1)
+				gevent.sleep(2)
 
 def test_ChunkServer():
 	print '     test begin     '.center(100,'-')
@@ -166,39 +152,16 @@ def test_ChunkServer():
 	print
 	print '     test end     '.center(100,'-')
 
-def link_test():
-	global PARAM
-	helpmsg = '''group directories before files.
-				augment with a --sort option, but any
-				use of --sort=none (-U) disables grouping
-			  '''
-	default_cfgfile = './test.conf'
-	cfgdict = (('MDS_IP', 'M', '192.168.0.149', 'ip address of metadata server'), \
-				('MDS_PORT','m','6789','port of metadata server'), \
-				('CHK_IP','C', '192.168.0.149', helpmsg), \
-				('CHK_PORT','c', '3456', 'the port of chunk server'),\
-				('enablexxx','x',False,'enable x'),\
-				('cfgfile','f', default_cfgfile, 'name of the configuration file'))
-	configure,_ = config.config(cfgdict)
-	PARAM = util.Object(configure)
-	# print PARAM.cfgfile
-	default_cfgfile = './test.conf'
-	print '----------------',PARAM.MDS_IP, int(PARAM.MDS_PORT)
-	# print configure
-	chkserver=ChunkServer()
-	logging.basicConfig(level=logging.DEBUG)	
-	gevent.spawn(heartBeat, server=chkserver, mds_ip=PARAM.MDS_IP, mds_port=int(PARAM.MDS_PORT), chk_port=int(PARAM.CHK_PORT))
-	service=rpc.RpcService(chkserver)
-	framework=gevent.server.StreamServer(('0.0.0.0',int(PARAM.CHK_PORT)), service.handler)
-	framework.serve_forever()
 
 def main():
 	#cfgstruct=(...)
 	#mdsaddress, mdsport, address, port, lvmgroup, lvprefix, config, logging-level, help
 	#remove globals as much as possible
+	pass
 
 
 
 if __name__=='__main__':
-	link_test()
+	pass
+	# link_test()
 	#test_ChunkServer()
