@@ -85,7 +85,7 @@ class MDSClient:
 class ChunkServerClient:
 	
 	def __init__(self, guid, csip, csport):
-		self.guid = guid
+		self.__class__.guid=guid
 		self.endpoint=(csip, csport)
 	
 	def getStub(self):
