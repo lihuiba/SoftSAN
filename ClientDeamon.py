@@ -46,6 +46,22 @@ class ClientDeamon:
 			return False
 		return True
 
+	def MapMirrorVolume(self, volumename, devlist):
+		tblist = []
+		start = 0
+		params = 'core 2 64 nosync ' + len(devlist)
+		for dev in devlist:
+			size += dev.size*2048
+			params += ' ' + dev.parameters[1] + ' 0'
+		table = dm.table(start, size, 'mirror', params)
+		tblist.append(table)
+		try:
+			dm.map(volumename, tblist)
+		except Exception as ex:
+			logging.error(str(ex))
+			return False
+		return True
+
 	def MapGFSVolume(self, volumename, devlist):
 		tblist = []
 		start = 0
@@ -73,7 +89,7 @@ class ClientDeamon:
 		size = req.volume.size
 		dmtype = req.volume.assembler
 
-		logging.info('Mapping volume:', req.volume.parameters[0])
+		logging.info('Mapping volume: '+req.volume.parameters[0])
 
 		if dmtype == 'linear':
 			result = self.MapLinearVolume(volumename, req.volume.subvolumes)
@@ -83,6 +99,8 @@ class ClientDeamon:
 			else:
 				stripedsize = 256
 			result = self.MapStripedVolume(volumename, stripedsize, req.volume.subvolumes)
+		elif dmtype == 'mirror':
+			result = self.MapMirrorVolume(volumename, req.volume.subvolumes)
 		elif dmtype == 'gfs':
 			result = self.MapGFSVolume(volumename, req.volume.subvolumes)
 
