@@ -1,7 +1,7 @@
 import getopt, sys
 import ConfigParser, string
 
-def config(cfgstruct, cfgfile='cfgfile'):
+def config(cfgstruct, cfgfile='cfgfile', section='default'):
 	cfgdict=dict([item[0], list(item[1:])] for item in cfgstruct)
 	# get value from command
 	abbrevstring=''
@@ -13,7 +13,11 @@ def config(cfgstruct, cfgfile='cfgfile'):
 		else:
 			verbose.append(key+'=')
 			abbrevstring += (cfgdict[key][0]+':')
-	opts, noOpt_args = getopt.getopt(sys.argv[1:], abbrevstring, verbose)
+	# print sys.argv
+	try:
+		opts, noOpt_args = getopt.gnu_getopt(sys.argv[1:], abbrevstring, verbose)
+	except Exception,e :
+		print e
 	# check whether the config file is specified in cmdline
 	if cfgdict.has_key(cfgfile):		#if app allows the user to specify a conf file name
 		filename = cfgdict[cfgfile][1]	#the default file name
@@ -33,7 +37,6 @@ def config(cfgstruct, cfgfile='cfgfile'):
 		config.readfp(fp)
 		fp.close()
 		# print 'original value:'.ljust(20,' '), cfgdict
-		section='default'
 		for key in cfgdict:
 			try:
 				value = config.get(section,key)
@@ -47,9 +50,6 @@ def config(cfgstruct, cfgfile='cfgfile'):
 				pass
 	except:
 		pass
-	# update the value of configuration parameters from cmdline
-	# print 'opts:',opts
-	# print 'args:',noOpt_args
 	for o,a in opts:
 		o = o.lstrip('-')
 		if o in cfgdict:
@@ -63,10 +63,7 @@ def config(cfgstruct, cfgfile='cfgfile'):
 			item[1]=True
 		else:
 			item[1] = a
-	# print 'get value from command:'.ljust(20,' '), cfgdict
 	ret_dict = dict([key,cfgdict[key][1]] for key in cfgdict)
-	# print cfgdict
-	# # print the usage message
 	return ret_dict, noOpt_args
 
 def usage_print(cfgstruct, breadth1=5, breadth2=2, breadth3=50):
@@ -99,17 +96,19 @@ if __name__ == '__main__':
 			  '''
 	default_cfgfile = './test.conf'
 
-	cfgdict = (('MDS_IP', 'M', '192.168.0.149', 'ip address of metadata server'), \
-				('MDS_PORT','m','6789','port of metadata server'), \
-				('CHK_IP','C', '192.168.0.149', helpmsg), \
-				('CHK_PORT','c', '3456', 'the port of chunk server'),\
-				('enablexxx','x',False,'enable x'),\
-				('cfgfile','f', default_cfgfile, 'name of the configuration file'))
+	cfgstruct = (\
+		('address',			'a',	'0.0.0.0',	'ip address to bind'), \
+		('chk_port',		'p',	0x2121,		'tcp port to bind'), \
+		('mds_ip',			'M',	'192.168.0.149',	'mds ip address'), \
+		('mds_port',		'm',	0x6789,		'mds port'), \
+		('vg',				'x',	'VolGroup',	'name of volume group'),\
+		('volprefix',		'z',	'lv_softsan_',	'prefix of volume name'),\
+		('logging-level',	'l',	'info',		'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
+		('config',			'c',	'./Chunkserver.conf',	'config file'),\
+		('help',			'h',	False,		'this help'),\
 
-	argudict, noOpt_args = config(cfgdict)
+	)
+
+	argudict, noOpt_args = config(cfgstruct)
 	print argudict
 	print noOpt_args
-	# for key in argudict:
-	# 	print key, '=', argudict[key],' '
-
-	# cfgdict must contain the cfgfile and the default value is specified.

@@ -105,13 +105,10 @@ class ChunkServer:
 	def heartBeat(self, confobj):
 		guid=Guid.generate()
 		stub=rpc.RpcStub(guid, None, mds.MDS)
-
 		while True:
 			try:
 				socket=gevent.socket.socket()
-				# print (confobj.mds_ip, int(confobj.mds_port))
 				socket.connect((confobj.mds_ip, int(confobj.mds_port)))
-				
 				stub.socket=socket
 				self.doHeartBeat(int(confobj.chk_port), stub, socket)
 			except KeyboardInterrupt:

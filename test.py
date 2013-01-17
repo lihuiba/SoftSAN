@@ -1,8 +1,3 @@
-# # import Client
-
-# def test_chkserv():
-# 	csc = Client.ChunkServerClient()
-import block.dm
 
 g = 1
 
@@ -44,7 +39,19 @@ def test_dir():
 	print dic
 	if dic.has_key('date'):
 		print 'has key %s' %('date')
-	
+
+def test_config():
+	import ConfigParser
+	filename = './test.conf'
+	fp=open(filename,'rb')
+	config = ConfigParser.ConfigParser()
+	config.readfp(fp)
+	fp.close()
+	section='default'
+	key='port'
+	# value = config.getint(section,key)
+	# print type(value), value
+
 
 def test(*args, **kwargs):
 	print args
@@ -53,7 +60,7 @@ def test(*args, **kwargs):
 
 
 if __name__ == '__main__':
-	test_dir()
+	test_config()
 	
 	
 
