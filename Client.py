@@ -14,7 +14,16 @@ from util import Pool
 from collections import Iterable
 import util, config
 
+#vertical, up and right, vertical and right, horizontal, horizontal and down
+branch = [
+		'\342\224\202',\
+		'\342\224\224',\
+		'\342\224\234',\
+		'\342\224\200',\
+		'\342\224\254'
+]
 
+#default chunk size
 CHUNKSIZE = 64
 
 class MDSClient:
@@ -56,13 +65,10 @@ class MDSClient:
 			path = Guid.toStr(name)
 		req = msg.ReadVolume_Request()
 		req.fullpath = '/'+path
-		try:
-			ret = self.stub.callMethod('ReadVolume', req)
-			volume = msg.Volume()
-			volume.ParseFromString(ret.volume)
-			return msg2obj(volume)
-		except:
-			return None
+		ret = self.stub.callMethod('ReadVolume', req)
+		volume = msg.Volume()
+		volume.ParseFromString(ret.volume)
+		return msg2obj(volume)
 
 	def MoveVolumeInfo(self, source, dest):
 		req = msg.MoveVolume_Request()
@@ -137,7 +143,7 @@ class Client:
 		self.chkpool = Pool(ChunkServerClient, ChunkServerClient.Clear)
 		self.mds = MDSClient(self.guid, mdsip, mdsport)
 		self.socket = gevent.socket.socket()
-		self.socket.connect((Client_IP, Client_Port))
+		self.socket.connect(('192.168.0.12', 6767))
 		self.stub = rpc.RpcStub(self.guid, self.socket, ClientDeamon.ClientDeamon)
 
 		#self.RestoreVolumeInfo()
@@ -378,12 +384,32 @@ class Client:
 		for subvolume in volume.subvolumes:
 			self.DeleteVolumeTree(subvolume)
 
-	def InfoVolume(self, name):
-		volume = self.mds.ReadVolumeInfo(name)
+	def ListVolume(self, data):
+		volume = self.mds.ReadVolumeInfo(data.name)
 		space = '      '
 		print 'name:', space, volume.parameters[0]
 		print 'path:', space, volume.parameters[1]
 		print 'size:', space, volume.size, 'MB'
+
+		if data.tree == '1':
+			self.print_tree(volume, '')
+
+	def print_tree(self, volume, prefix):
+		print volume.parameters[1]
+		if hasattr(volume, 'subvolumes'):
+			num = len(volume.subvolumes)
+		else:
+			num = 0
+		i = 0
+		for i in range(0, num):
+			subvolume_name = volume.subvolumes[i].parameters[1]
+			if i == num-1:
+				print prefix+' '+branch[1],
+				add = '  '
+			else:
+				print prefix+' '+branch[2],
+				add = ' '+branch[0]
+			self.print_tree(volume.subvolumes[i], prefix+add)
 
 	def RestoreVolumeInfo(self):
 		mplist = dm.maps()
@@ -403,7 +429,7 @@ class Client:
 def test():
 	global PARAM
 	client = Client(Mds_IP, int(Mds_Port))
-	#client.InfoVolume('hello_softsan_striped')
+	#client.ListVolume('hello_softsan_striped')
 
 	# create a stiped type volume
 	# arg = Object()
