@@ -1,5 +1,3 @@
-import logging
-
 def gethostname(mdsip):
 	'mdsip: the IP address of MDS'
 	import socket
@@ -59,14 +57,30 @@ def object2message(object, message):
 				print 'exception occured'
 				pass
 
-str2logginglevel={\
-	'debug'		: logging.DEBUG,\
-	'info'		: logging.INFO,\
-	'warning'	: logging.WARNING,\
-	'warn'		: logging.WARNING,\
-	'error'		: logging.ERROR,\
-	'fatal'		: logging.CRITICAL,\
-}
+def setupLogging(configure):
+	import logging, os, os.path
+	str2logginglevel={\
+		'debug'		: logging.DEBUG,\
+		'info'		: logging.INFO,\
+		'warning'	: logging.WARNING,\
+		'warn'		: logging.WARNING,\
+		'error'		: logging.ERROR,\
+		'fatal'		: logging.CRITICAL,\
+	}
+	loglevel=configure['logging-level']
+	assert loglevel in str2logginglevel, 'invalid logging level "{0}"'.format(level)
+	loglevel=str2logginglevel[loglevel]
+
+	logfile=configure['logging-file']
+	if logfile=='stdout':
+		logfile=None
+	else:
+		assert not logfile[-1] in ['/', '\\'], 'logging-file must NOT be a directory'
+		directory=os.path.dirname(logfile)
+		if not os.path.isdir(directory):
+			os.makedirs(directory)
+	logging.basicConfig(filename=logfile, level=loglevel)
+
 
 class Pool:
 	def __init__(self, constructor, destructor=None):

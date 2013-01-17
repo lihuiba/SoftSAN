@@ -86,12 +86,12 @@ class ChunkServer:
 			Guid.assign(t, a_guid)
 		return ret
 
-	def doHeartBeat(self, chk_port, stub, socket):
-		chunkserver_ip=socket.getsockname()[0]
+	def doHeartBeat(self, serviceport, stub):
+		serviceip=stub.socket.getsockname()[0]
 		while True:
 			info=msg.ChunkServerInfo()
-			info.ServiceAddress=chunkserver_ip
-			info.ServicePort=chk_port
+			info.ServiceAddress=serviceip
+			info.ServicePort=serviceport
 			self.lvm.reload_softsan_lvs()
 			for lv in self.lvm.softsan_lvs:
 				chk=info.chunks.add()
@@ -109,11 +109,11 @@ class ChunkServer:
 		while True:
 			try:
 				socket=gevent.socket.socket()
-				# print (confobj.mds_ip, int(confobj.mds_port))
-				socket.connect((confobj.mds_ip, int(confobj.mds_port)))
-				
+				mdsEndpoint=(confobj.mdsaddress, int(confobj.mdsport))
+				# print mdsEndpoint
+				socket.connect(mdsEndpoint)				
 				stub.socket=socket
-				self.doHeartBeat(int(confobj.chk_port), stub, socket)
+				self.doHeartBeat(int(confobj.port), stub)
 			except KeyboardInterrupt:
 				raise
 			except:

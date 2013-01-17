@@ -7,15 +7,16 @@ Usage: chkserv-cli [options]
 options:"""
 
 cfgstruct = (\
-	('address',			'a',	'0.0.0.0',	'ip address to bind'), \
-	('chk_port',		'p',	0x2121,		'tcp port to bind'), \
-	('mds_ip',			'M',	'192.168.0.149',	'mds ip address'), \
-	('mds_port',		'm',	0x6789,		'mds port'), \
-	('vg',				'x',	'VolGroup',	'name of volume group'),\
-	('volprefix',		'z',	'lv_softsan_',	'prefix of volume name'),\
-	('logging-level',	'l',	'info',		'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
-	('config',			'c',	'./Chunkserver.conf',	'config file'),\
-	('help',			'h',	False,		'this help'),\
+	('address',			'a',	'0.0.0.0',			'IP address to bind'), \
+	('port',			'p',	0x2121,				'TCP port to bind'), \
+	('mdsaddress',		'M',	'0.0.0.0',			'meta data server address'), \
+	('mdsport',			'm',	0x6789,				'meta data server TCP port'), \
+	('vg',				'g',	'SANGroup',			'name of volume group for use exclusively by SoftSAN'),\
+	('volprefix',		'z',	'lv_softsan_',		'prefix of volume name'),\
+	('logging-level',	'l',	'info',				'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
+	('logging-file',	'f',	'stdout',			'logging appends to this file'),\
+	('config',			'c',	'Chunkserver.conf',	'config file'),\
+	('help',			'h',	False,				'this help'),\
 
 )
 
@@ -30,14 +31,10 @@ if configure['help']==True:
 	config.usage_print(cfgstruct)
 	exit(0)
 
-loglevel=configure['logging-level']
-if not loglevel in util.str2logginglevel:
-	print >>sys.stderr, 'invalid logging level "{0}"'.format(level)
-	exit(-1)
-loglevel=util.str2logginglevel[loglevel]
-logging.basicConfig(level=loglevel)
+util.setupLogging(configure)
 server=ChunkServer.ChunkServer()
 gevent.spawn(server.heartBeat, confobj)
 service=rpc.RpcService(server)
-framework=gevent.server.StreamServer((configure['address'], int(configure['chk_port'])), service.handler)
+endpoint=(configure['address'], int(configure['port'])
+framework=gevent.server.StreamServer(endpoint), service.handler)
 framework.serve_forever()
