@@ -15,7 +15,7 @@ class ChunkServer:
 		self.prefix_vol = prefix_vol
 		self.vgname = vgname
 	
-#  always use lun_index=1. 
+	#  always use lun_index=1. 
 	def AssembleVolume(self, req):
 		self.tgt.reload()
 		ret = msg.AssembleVolume_Response()
@@ -52,7 +52,7 @@ class ChunkServer:
 			ret.error=('failed to Disassemble Volume'+target_name)
 		return ret
 
-# try to create every requested chunk. however, if some chunk can not be created, fill the ret.error with the output of lvcreate 
+	# try to create every requested chunk. however, if some chunk can not be created, fill the ret.error with the output of lvcreate 
 	def NewChunk(self, req):
 		self.lvm.reload()
 		ret = msg.NewChunk_Response()
@@ -69,7 +69,7 @@ class ChunkServer:
 			Guid.assign(t, a_guid)
 		return ret
 
-# try to delete every requested chunk. if it can not delete, fill the ret.error with output of lvremove
+	# try to delete every requested chunk. if it can not delete, fill the ret.error with output of lvremove
 	def DeleteChunk(self, req):
 		self.lvm.reload()
 		ret = msg.DeleteChunk_Response()
@@ -86,12 +86,12 @@ class ChunkServer:
 			Guid.assign(t, a_guid)
 		return ret
 
-	def doHeartBeat(self, chk_port, stub, socket):
-		chunkserver_ip=socket.getsockname()[0]
+	def doHeartBeat(self, serviceport, stub):
+		serviceip=stub.socket.getsockname()[0]
 		while True:
 			info=msg.ChunkServerInfo()
-			info.ServiceAddress=chunkserver_ip
-			info.ServicePort=chk_port
+			info.ServiceAddress=serviceip
+			info.ServicePort=serviceport
 			self.lvm.reload_softsan_lvs()
 			for lv in self.lvm.softsan_lvs:
 				chk=info.chunks.add()
@@ -108,9 +108,11 @@ class ChunkServer:
 		while True:
 			try:
 				socket=gevent.socket.socket()
-				socket.connect((confobj.mds_ip, int(confobj.mds_port)))
+				socket.connect((confobj.mdsaddress, int(confobj.mdsport)))
+				mdsEndpoint=(confobj.mdsaddress, int(confobj.mdsport))
+				socket.connect(mdsEndpoint)				
 				stub.socket=socket
-				self.doHeartBeat(int(confobj.chk_port), stub, socket)
+				self.doHeartBeat(int(confobj.port), stub)
 			except KeyboardInterrupt:
 				raise
 			except:
@@ -148,13 +150,6 @@ def test_ChunkServer():
 	ret_delchunk = server.DeleteChunk(req_delchunk)
 	print
 	print '     test end     '.center(100,'-')
-
-
-def main():
-	#cfgstruct=(...)
-	#mdsaddress, mdsport, address, port, lvmgroup, lvprefix, config, logging-level, help
-	#remove globals as much as possible
-	pass
 
 
 

@@ -90,25 +90,26 @@ def indent_print(longstr,  breadth=50, indent=15):
 	print head,line
 
 if __name__ == '__main__':
-	helpmsg = '''group directories before files.
-				augment with a --sort option, but any
-				use of --sort=none (-U) disables grouping
-			  '''
-	default_cfgfile = './test.conf'
+	import util,config
 
 	cfgstruct = (\
-		('address',			'a',	'0.0.0.0',	'ip address to bind'), \
-		('chk_port',		'p',	0x2121,		'tcp port to bind'), \
-		('mds_ip',			'M',	'192.168.0.149',	'mds ip address'), \
-		('mds_port',		'm',	0x6789,		'mds port'), \
-		('vg',				'x',	'VolGroup',	'name of volume group'),\
-		('volprefix',		'z',	'lv_softsan_',	'prefix of volume name'),\
-		('logging-level',	'l',	'info',		'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
-		('config',			'c',	'./Chunkserver.conf',	'config file'),\
-		('help',			'h',	False,		'this help'),\
-
+	('address',			'a',	'0.0.0.0',			'IP address to bind'), \
+	('port',			'p',	0x2121,				'TCP port to bind'), \
+	('mdsaddress',		'M',	'127.0.0.1',			'meta data server address'), \
+	('mdsport',			'm',	0x26505,				'meta data server TCP port'), \
+	('vg',				'g',	'SANGroup',			'name of volume group for use exclusively by SoftSAN'),\
+	('volprefix',		'z',	'lv_softsan_',		'prefix of volume name'),\
+	('logging-level',	'l',	'info',				'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
+	('logging-file',	'f',	'stdout',			'logging appends to this file'),\
+	('config',			'c',	'Chunkserver.conf',	'config file'),\
+	('help',			'h',	False,				'this help'),\
 	)
 
-	argudict, noOpt_args = config(cfgstruct)
-	print argudict
-	print noOpt_args
+	configure, noOpt_args = config(cfgstruct)
+	print configure,'00000000000000000'
+	if configure['help']==True:
+		config.usage_print(cfgstruct)
+		exit(0)
+	confobj = util.Object(configure)
+	
+	
