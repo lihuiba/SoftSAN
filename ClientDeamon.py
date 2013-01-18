@@ -10,7 +10,7 @@ import scandev
 
 VolumeDict = {}
 
-class ClientDeamon:
+class DMClient:
 
 	def MapLinearVolume(self, volumename, devlist):
 		tblist = []
@@ -111,9 +111,9 @@ class ClientDeamon:
 			logging.error(ret.error)
 			return ret
 
-		VolumeDict[volumename] = req.volume
-		for subvol in req.volume.subvolumes:
-			VolumeDict[subvol.parameters[0]] = subvol
+		# VolumeDict[volumename] = req.volume
+		# for subvol in req.volume.subvolumes:
+		# 	VolumeDict[subvol.parameters[0]] = subvol
 		return ret
 
 	def SplitVolume(self, req):
@@ -197,7 +197,7 @@ class ClientDeamon:
 					mp.remove()
 		except Exception as ex:
 			logging.error('device mapper: removing volume {0} failed'.format(volume.parameters[0]))
-			logging.error(str(ex))
+			logging.error(str(ex))   
 			return False
 		for subvolume in volume.subvolumes:
 			if self.DeleteVolumeTree(subvolume.parameters[0]) == False:
@@ -205,6 +205,14 @@ class ClientDeamon:
 		del VolumeDict[volume.parameters[0]]
 		return True
 
+	def GetVolumeMap(name):
+		mps = dm.maps()
+		name = volume.parameters[0]
+		for mp in mps:
+			if name == mp.name:
+				return mp
+		return None
+		
 
 if __name__=='__main__':
 	logging.basicConfig(level=logging.DEBUG)

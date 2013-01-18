@@ -5,7 +5,7 @@ import gevent.socket
 import guid as Guid
 import block.dm as dm
 from mds import Object
-import libiscsi
+import libiscsi, os
 import scandev, config
 import ClientDeamon
 from util import message2object as msg2obj
@@ -14,13 +14,14 @@ from util import Pool
 from collections import Iterable
 import util, config
 
+#branches of volume tree
 #vertical, up and right, vertical and right, horizontal, horizontal and down
 branch = [
 		'\342\224\202',\
 		'\342\224\224',\
 		'\342\224\234',\
 		'\342\224\200',\
-		'\342\224\254'
+		'\342\224\254' \
 ]
 
 #default chunk size
@@ -65,7 +66,13 @@ class MDSClient:
 			path = Guid.toStr(name)
 		req = msg.ReadVolume_Request()
 		req.fullpath = '/'+path
-		ret = self.stub.callMethod('ReadVolume', req)
+		try:
+			ret = self.stub.callMethod('ReadVolume', req)
+		except Exception as ex:
+			index = str(ex).find(path)
+			if index > -1:
+				return None
+			logging.error(str(ex))
 		volume = msg.Volume()
 		volume.ParseFromString(ret.volume)
 		return msg2obj(volume)
@@ -227,6 +234,9 @@ class Client:
 		
 	def MountVolume(self, volume_name):
 		volume = self.mds.ReadVolumeInfo(volume_name)
+		if isinstance(volume, type(None)):
+			logging.error('Volume does not exist: '+volume_name)
+			return False
 		req = msg.MountVolume_Request()
 		obj2msg(volume, req.volume)
 		if self.MountVolumeTree(volume) == False:
@@ -250,6 +260,9 @@ class Client:
 
 	def UnmountVolume(self, volume_name):
 		volume = self.mds.ReadVolumeInfo(volume_name)
+		if isinstance(volume, type(None)):
+			logging.error('Volume does not exist: '+volume_name)
+			return False
 		req = msg.UnmountVolume_Request()
 		req.volume_name = volume.parameters[0]
 		ret = self.stub.callMethod('UnmountVolume', req)
@@ -279,6 +292,9 @@ class Client:
 
 	def SplitVolume(self, volumename):
 		volume = self.mds.ReadVolumeInfo(volumename)
+		if isinstance(volume, type(None)):
+			logging.error('Volume does not exist: '+volumename)
+			return False
 		if volume.subvolumes[0].assembler == 'chunk':
 			logging.error('This volume is not divisible!')
 			return False
@@ -306,6 +322,9 @@ class Client:
 		if len(volnames) > 0:
 			for name in volnames:
 				vol = self.mds.ReadVolumeInfo(name)
+				if isinstance(vol, type(None)):
+					logging.error('Volume does not exist: '+name)
+					return False
 				if vol.parameters[2] == 'used':
 					print 'volume '+name+' has been used'
 					return False
@@ -373,7 +392,10 @@ class Client:
 	def DeleteVolumeTree(self, volume):
 		if isinstance(volume, str):
 			volume = self.mds.ReadVolumeInfo(volume)
-		self.mds.DeleteVolumeInfo(volume)
+			if isinstance(volume, type(None)):
+				logging.error('Volume does not exist'+volume)
+				return False
+		
 		if volume.assembler == 'chunk':
 			addr = volume.parameters[3]
 			port = int(volume.parameters[4])
@@ -382,27 +404,32 @@ class Client:
 			chkclient.DeleteChunk(volume)
 			return True
 		for subvolume in volume.subvolumes:
-			self.DeleteVolumeTree(subvolume)
+			if self.DeleteVolumeTree(subvolume) == False:
+				return False
+
+		self.mds.DeleteVolumeInfo(volume)
+		return True
 
 	def ListVolume(self, data):
 		volume = self.mds.ReadVolumeInfo(data.name)
+		if isinstance(volume, type(None)):
+			logging.error('Volume does not exist'+data.name)
+			return False
 		space = '      '
 		print 'name:', space, volume.parameters[0]
 		print 'path:', space, volume.parameters[1]
 		print 'size:', space, volume.size, 'MB'
-
 		if data.tree == '1':
 			self.print_tree(volume, '')
 
 	def print_tree(self, volume, prefix):
-		print volume.parameters[1]
+		print os.path.basename(volume.parameters[1])
 		if hasattr(volume, 'subvolumes'):
 			num = len(volume.subvolumes)
 		else:
 			num = 0
 		i = 0
 		for i in range(0, num):
-			subvolume_name = volume.subvolumes[i].parameters[1]
 			if i == num-1:
 				print prefix+' '+branch[1],
 				add = '  '
@@ -415,7 +442,7 @@ class Client:
 		mplist = dm.maps()
 		for mp in mplist:
 			volume = self.mds.ReadVolumeInfo(mp.name)
-			if volume != None:
+			if not isinstance(volume, type(None)):
 				req = msg.ClientWriteVolume_Request()
 				obj2msg(volume, req.volume)
 				self.stub.callMethod('ClientWriteVolume', req)
