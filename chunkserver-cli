@@ -9,19 +9,19 @@ options:"""
 cfgstruct = (\
 	('address',			'a',	'0.0.0.0',			'IP address to bind'), \
 	('port',			'p',	0x2121,				'TCP port to bind'), \
-	('mdsaddress',		'M',	'127.0.0.1',			'meta data server address'), \
-	('mdsport',			'm',	0x26505,				'meta data server TCP port'), \
+	('mdsaddress',		'M',	None,				'meta data server address'), \
+	('mdsport',			'm',	0x6789,				'meta data server TCP port'), \
 	('vg',				'g',	'SANGroup',			'name of volume group for use exclusively by SoftSAN'),\
 	('volprefix',		'z',	'lv_softsan_',		'prefix of volume name'),\
 	('logging-level',	'l',	'info',				'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
 	('logging-file',	'f',	'stdout',			'logging appends to this file'),\
-	('config',			'c',	'Chunkserver.conf',	'config file'),\
+	('config',			'c',	'softsan.conf',		'config file'),\
 	('help',			'h',	False,				'this help'),\
 
 )
 
 try:
-	configure,_ = config.config(cfgstruct, 'softsan.conf', 'chunkserver_section')
+	configure,_ = config.config(cfgstruct, 'chunkserver')
 	confobj = util.Object(configure)
 except:
 	pass
