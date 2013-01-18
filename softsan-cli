@@ -152,11 +152,14 @@ def ParseCMD(action, cmdline):
 
 
 def ParseArg():
-	conf, ss = config.config(argstruct, 'softsan-cli.conf')
-	
-	if not conf['logging-level'] in util.str2logginglevel:
-		print >>sys.stderr, 'invalid logging level "{0}"'.format(level)
-		exit(-1)
+	conf,_ = config.config(argstruct, 'client')
+	# if conf['mdsaddress'] != True:
+	# 	print >>sys.stderr,  'metadata server address must be specified'
+	# 	exit(-1)
+	# if conf['mdsport'] != True:
+	# 	print >>sys.stderr, 'metadata server service port must be specified'
+	# 	exit(-1)
+	util.setupLogging(conf)
 
 	#client = Client.Client(conf['mdsaddress'], conf['mdsport'])
 	cli = CLI()

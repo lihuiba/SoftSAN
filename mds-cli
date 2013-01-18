@@ -7,16 +7,17 @@ Usage: mds-cli [options]
 options:"""
 
 cfgstruct = (\
-	('address',			'a',	'0.0.0.0',	'ip address to bind'), \
-	('port',			'p',	0x6789,		'tcp port to bind'), \
-	('rootpath',		'r',	None,		'root path for serving meta data'),\
-	('logging-level',	'l',	'info',		'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
-	('config',			'c',	'mds.conf',	'config file'),\
-	('help',			'h',	False,		'this help'),\
+	('address',			'a',	'0.0.0.0',			'IP address to bind'), \
+	('port',			'p',	0x6789,				'TCP port to bind'), \
+	('rootpath',		'r',	None,				'root path for serving meta data'),\
+	('logging-level',	'l',	'info',				'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
+	('logging-file',	'f',	'stdout',			'logging appends to this file'),\
+	('config',			'c',	'softsan.conf',		'config file'),\
+	('help',			'h',	False,				'this help'),\
 )
 
 try:
-	configure,_ = config.config(cfgstruct, 'config')
+	configure,_ = config.config(cfgstruct, 'mds')
 except:
 	pass
 
@@ -25,25 +26,14 @@ if configure['help']==True:
 	config.usage_print(cfgstruct)
 	exit(0)
 
-loglevel=configure['logging-level']
-if not loglevel in util.str2logginglevel:
-	print >>sys.stderr, 'invalid logging level "{0}"'.format(level)
-	exit(-1)
-loglevel=util.str2logginglevel[loglevel]
-logging.basicConfig(level=loglevel)
-
+util.setupLogging(configure)
 rootpath=configure['rootpath']
-if not rootpath:
-	print >>sys.stderr, 'the rootpath option must be specified'
-	exit(-1)
-if not os.path.exists(rootpath):
-	print >>sys.stderr, 'the rootpath "{0}"" must exists'.format(rootpath)
-	exit(-1)
+assert rootpath, 'the rootpath option must be specified'
+assert os.path.isdir(rootpath), 'the rootpath "{0}" must exists'.format(rootpath)
 pdb=persistentdb.PersistentDB(rootpath)
 tdb=transientdb.TransientDB()
 server=mds.MDS(tdb, pdb)
 service=rpc.RpcService(server)
 endpoint=(configure['address'], int(configure['port']))
-print endpoint
 framework=gevent.server.StreamServer(endpoint, service.handler)
 framework.serve_forever()
