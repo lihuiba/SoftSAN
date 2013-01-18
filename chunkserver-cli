@@ -21,7 +21,7 @@ cfgstruct = (\
 )
 
 try:
-	configure,_ = config.config(cfgstruct, 'config')
+	configure,_ = config.config(cfgstruct, 'softsan.conf', 'chunkserver_section')
 	confobj = util.Object(configure)
 except:
 	pass

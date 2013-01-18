@@ -17,7 +17,7 @@ cfgstruct = (\
 )
 
 try:
-	configure,_ = config.config(cfgstruct, 'config')
+	configure,_ = config.config(cfgstruct, 'softsan.conf', 'mds_section')
 except:
 	pass
 

@@ -1,7 +1,7 @@
 import getopt, sys
 import ConfigParser, string
 
-def config(cfgstruct, cfgfile='cfgfile', section='default'):
+def config(cfgstruct, cfgfile='softsan.conf', section='default'):
 	cfgdict=dict([item[0], list(item[1:])] for item in cfgstruct)
 	# get value from command
 	abbrevstring=''
