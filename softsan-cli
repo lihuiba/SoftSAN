@@ -6,6 +6,7 @@ from mds import Object
 
 CHUNKSIZE = 64
 
+
 commands=(\
 	('name',	'n',	'',			'create a volume'),\
 	('params',  'p',	'',			'volume parameters'),\
