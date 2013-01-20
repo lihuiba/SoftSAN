@@ -152,10 +152,10 @@ class Client:
 		self.guid = Guid.generate()
 		self.chkpool = Pool(ChunkServerClient, ChunkServerClient.Clear)
 		self.mds = MDSClient(self.guid, mdsip, mdsport)
-		self.dmclient = DMClient()
-		self.socket = gevent.socket.socket()
-		self.socket.connect(('192.168.0.12', 6767))
-		self.stub = rpc.RpcStub(self.guid, self.socket, ClientDeamon.ClientDeamon)
+		#self.dmclient = DMClient()
+		#self.socket = gevent.socket.socket()
+		#self.socket.connect(('192.168.0.12', 6767))
+		#self.stub = rpc.RpcStub(self.guid, self.socket, ClientDeamon.ClientDeamon)
 
 		#self.RestoreVolumeInfo()
 		
