@@ -84,9 +84,6 @@ class MDSClient:
 		req.destination = dest
 		ret = self.stub.callMethod('MoveVolume', req)
 
-	def Clear(self):
-		self.socket.close()
-
 
 class ChunkServerClient:
 	
@@ -425,11 +422,6 @@ class Client:
 			volume = self.mds.ReadVolumeInfo(mp.name)
 			if not isinstance(volume, type(None)):
 				self.MountVolume(volume)
-
-	def Clear(self):
-		self.socket.close()
-		self.mds.Clear()
-		self.chkpool.dispose()
 
 
 def test():
