@@ -95,12 +95,13 @@ class ChunkServerClient:
 		self.endpoint=(csip, csport)
 	
 	def getStub(self):
-		if hasattr(self, 'stub'):
-			return self.stub
 		self.socket = gevent.socket.socket()
 		self.socket.connect(self.endpoint)
 		stub=rpc.RpcStub(self.guid, self.socket, ChunkServer.ChunkServer)
 		self.stub=stub
+		def getStub_New(self):
+			return self.stub
+		self.getStub=getStub_New
 		return stub
 
 	def NewChunk(self, size, count = 1):
@@ -141,6 +142,8 @@ class ChunkServerClient:
 
 	def Clear(self):
 		self.socket.close()
+		del self.getStub
+		del self.stub
 
 
 class Client:
