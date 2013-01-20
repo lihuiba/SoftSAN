@@ -149,8 +149,6 @@ class ChunkServerClient:
 
 class Client:
 	def __init__(self, mdsip, mdsport):
-		logging.basicConfig(level=logging.ERROR)
-
 		self.guid = Guid.generate()
 		self.chkpool = Pool(ChunkServerClient, ChunkServerClient.Clear)
 		self.mds = MDSClient(self.guid, mdsip, mdsport)
@@ -162,7 +160,7 @@ class Client:
 		#self.RestoreVolumeInfo()
 		
 	# give a list of chunk sizes, return a list of volumes
-    # volume : path node msg.volume
+	# volume : path node msg.volume
 	def NewChunkList(self, chksizes):
 		volumelist = []
 		
