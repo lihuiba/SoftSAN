@@ -143,6 +143,7 @@ class ChunkServerClient:
 	def Clear(self):
 		self.socket.close()
 		del self.getStub
+		del self.socket
 		del self.stub
 
 
