@@ -86,6 +86,8 @@ class Pool:
 	def __init__(self, constructor, destructor=None):
 		self.pool={}
 		self.ctor=constructor
+		if isinstance(destructor, str):
+			destructor=getattr(constructor, destructor)
 		self.dtor=destructor
 	def get(self, *key):
 		if key in self.pool:
