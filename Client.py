@@ -11,6 +11,7 @@ import ClientDeamon
 from util import message2object as msg2obj
 from util import object2message as obj2msg
 from util import Pool
+from ClientDeamon import DMClient
 from collections import Iterable
 import util, config
 
@@ -149,6 +150,7 @@ class Client:
 		self.guid = Guid.generate()
 		self.chkpool = Pool(ChunkServerClient, ChunkServerClient.Clear)
 		self.mds = MDSClient(self.guid, mdsip, mdsport)
+		self.dmclient = DMClient()
 		self.socket = gevent.socket.socket()
 		self.socket.connect(('192.168.0.12', 6767))
 		self.stub = rpc.RpcStub(self.guid, self.socket, ClientDeamon.ClientDeamon)
@@ -237,13 +239,9 @@ class Client:
 		if isinstance(volume, type(None)):
 			logging.error('Volume does not exist: '+volume_name)
 			return False
-		req = msg.MountVolume_Request()
-		obj2msg(volume, req.volume)
 		if self.MountVolumeTree(volume) == False:
 			return False
-		ret = self.stub.callMethod('MountVolume', req)
-		if ret.error != '':
-			logging.error(ret.error)
+		if self.dmclient.MountVolume(volume) == False
 			return False
 		return True
 
@@ -263,11 +261,7 @@ class Client:
 		if isinstance(volume, type(None)):
 			logging.error('Volume does not exist: '+volume_name)
 			return False
-		req = msg.UnmountVolume_Request()
-		req.volume_name = volume.parameters[0]
-		ret = self.stub.callMethod('UnmountVolume', req)
-		if ret.error != '':
-			logging.error(ret.error)
+		if self.dmclient.DeleteVolume(volume) == False:
 			return False
 		if self.UnmountVolumeTree(volume) == False:
 			return False
@@ -281,15 +275,6 @@ class Client:
 				return False
 		return True
 
-	def MapVolume(self, volume):
-		req = msg.MapVolume_Request()
-		obj2msg(volume, req.volume)
-		ret = self.stub.callMethod('MapVolume', req)
-		if ret.error == '':
-			return True
-		print ret.error
-		return False
-
 	def SplitVolume(self, volumename):
 		volume = self.mds.ReadVolumeInfo(volumename)
 		if isinstance(volume, type(None)):
@@ -299,9 +284,8 @@ class Client:
 			logging.error('This volume is not divisible!')
 			return False
 
-		req = msg.SplitVolume_Request()
-		req.volume_name = volumename
-		ret = self.stub.callMethod('SplitVolume', req)
+		if self.dmclient.SplitVolume(volume) == False:
+			return False
 		self.mds.DeleteVolumeInfo(volume)
 		for subvol in volume.subvolumes:
 			subvol.parameters[2] = 'free'
@@ -365,7 +349,7 @@ class Client:
 		volume.parameters = [volname, '/dev/mapper/'+volname, 'free']
 		volume.parameters.extend(params)
 
-		ret = self.MapVolume(volume)
+		ret = self.dmclient.MapVolume(volume)
 		if ret == False:
 			logging.error('Map volume failed')
 			if volume.subvolumes[0].assembler == 'chunk':
@@ -382,20 +366,16 @@ class Client:
 		return True
  
 	def DeleteVolume(self, name):
+		volume = self.mds.ReadVolumeInfo(volume)
+		if isinstance(volume, type(None)):
+			logging.error('Volume does not exist'+volume)
+			return False
 		if isinstance(name, Object):
 			name = name.parameters[0]
 		self.DeleteVolumeTree(name)
-		req = msg.ClientDeleteVolume_Request()
-		req.volume_name = name
-		ret = self.stub.callMethod('ClientDeleteVolume', req)
+		self.dmclient.DeleteVolume(volume)
 
 	def DeleteVolumeTree(self, volume):
-		if isinstance(volume, str):
-			volume = self.mds.ReadVolumeInfo(volume)
-			if isinstance(volume, type(None)):
-				logging.error('Volume does not exist'+volume)
-				return False
-		
 		if volume.assembler == 'chunk':
 			addr = volume.parameters[3]
 			port = int(volume.parameters[4])
@@ -406,7 +386,6 @@ class Client:
 		for subvolume in volume.subvolumes:
 			if self.DeleteVolumeTree(subvolume) == False:
 				return False
-
 		self.mds.DeleteVolumeInfo(volume)
 		return True
 
@@ -443,9 +422,7 @@ class Client:
 		for mp in mplist:
 			volume = self.mds.ReadVolumeInfo(mp.name)
 			if not isinstance(volume, type(None)):
-				req = msg.ClientWriteVolume_Request()
-				obj2msg(volume, req.volume)
-				self.stub.callMethod('ClientWriteVolume', req)
+				self.MountVolume(volume)
 
 	def Clear(self):
 		self.socket.close()
