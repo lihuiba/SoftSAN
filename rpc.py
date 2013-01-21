@@ -1,4 +1,4 @@
-import logging, inspect, sys, traceback
+import logging, inspect, sys, traceback, pickle
 import messages_pb2 as msg
 import guid as Guid
 
@@ -67,21 +67,6 @@ class RpcService:
 	def currentSocket(self):
 		return self.cursocket
 	
-	@staticmethod
-	def callMethod(method, argument, rettype):
-		ret=None
-		logging.debug(type(argument))
-		try:
-			ret=method(argument)
-			assert type(ret)==rettype
-		except:
-			logging.error("exception ", exc_info=1)
-			if rettype!=type(None):
-				ret=rettype()
-				if hasattr(ret, 'error'):
-					ret.error=str(sys.exc_info()[1])
-		return ret
-	
 	def doService(self, socket):
 		guid,token,name,body=recvRpc(socket)
 		self.peerguid=guid
@@ -90,13 +75,15 @@ class RpcService:
 			MI=self.methodInfo[name]
 			argument=MI[0].FromString(body)
 			method=getattr(self.theServer, name)
-			ret=self.callMethod(method, argument, MI[1])
+			rettype=MI[1]
+			ret=method(argument)
+			assert type(ret)==rettype
 			if ret==None: return
 			body=ret.SerializeToString()
 		except:
 			name='Exception'
-			exctype,value = sys.exc_info()[:2]
-			body="{0}\n{1}".format(value.__class__.__name__, value)
+			exception = sys.exc_info()[1]
+			body=pickle.dumps(exception)
 			logging.error("exception ", exc_info=1)
 		sendRpc(socket, guid, token, name, body)		
 	
@@ -138,7 +125,8 @@ class RpcStub:
 		assert guid==self.guid
 		assert token==self.token
 		if name_=='Exception':
-			raise Exception(body)
+			exception=pickle.loads(body_)
+			raise exception
 		assert name_==name
 		self.token=token+1
 		ret=MI[1].FromString(body_)
