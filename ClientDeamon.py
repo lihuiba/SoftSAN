@@ -89,7 +89,7 @@ class DMClient:
 		size = volume.size
 		dmtype = volume.assembler
 
-		logging.info('Mapping volume: '+volume.parameters[0])
+		logging.info('device mapper: mapping volume: '+volume.parameters[0])
 
 		if dmtype == 'linear':
 			result = self.MapLinearVolume(volumename, volume.subvolumes)
@@ -119,6 +119,8 @@ class DMClient:
 		except Exception as ex:
 			logging.error('device mapper: split volume {0} failed'.format(req.volume_name))
 			logging.error(str(ex))
+			return False
+		return True
 
 	def MountVolume(self, volume):
 		if volume.assembler == 'chunk':

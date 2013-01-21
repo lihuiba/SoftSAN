@@ -14,12 +14,15 @@ commands=(\
 	('count',	'c', 	'0',		'list object information'),\
 	('type',	't', 	'linear',	'split a volume into subvolumes'),\
 	('tree',	'', 	'0',		'list object information'),\
+	('help',	'h',	False,		'this help'),\
 )
 argstruct=(\
-	('mdsaddress',		'a',		'',					'metadata server address'),\
+	('mdsaddress',		'a',		'0.0.0.0',			'metadata server address'),\
 	('mdsport',			'p',		0x6789,				'metadata server port'),\
 	('logging-level',	'l',		'info',				'logging level, can be "debug", "info", "warning", "error" or "critical"'), \
-	('config',			'c',		'softsan-cli.conf',	'config file'),\
+	('config',			'c',		'softsan.conf',		'config file'),\
+	('logging-file',	'f',		'stdout',			'logging appends to this file'),\
+	('help',			'h',		False,				'this help'),\
 )
 
 def ParseTable(args, subvolumes):
@@ -41,7 +44,7 @@ def ParseTable(args, subvolumes):
 	if args.size != '':
 		ret.size = int(args.size)
 	if args.type != 'linear' and args.type != 'striped' and\
-		args.type != 'mirror' and args.type != 'gfs':
+	   args.type != 'mirror' and args.type != 'gfs':
 		print >>sys.stderr, 'volume type can only be linear/striped/mirror/gfs'
 		return None
 	if args.params != '':
@@ -58,7 +61,7 @@ def ParseTable(args, subvolumes):
 		return None
 	count = int(args.count)
 	if count < 0:
-		print >>sys.stderr, 'count can not be negative'
+		print >>sys.stderr, 'count must not be negative'
 		return None
 	if count == 0:
 		if ret.type == 'linear' or ret.type == 'gfs':
@@ -91,6 +94,9 @@ def ParseTable(args, subvolumes):
 		if subvolumes[0].isdigit() == True:
 			totsize = 0
 			for i in range(0, count):
+				if subvolumes[i].isdigit() == False:
+					print >>sys.stderr, 'chunk size must be digit'
+					return None
 				ret.chunksizes.append(int(subvolumes[i]))
 				totsize += int(int(subvolumes[i]))
 			if totsize > ret.size:
@@ -108,10 +114,9 @@ def ParseTable(args, subvolumes):
 			ret.subvolumes = subvolumes
 	return ret
 
-def ParseCMD(action, cmdline):
+def ParseCMD(client, action, cmdline):
 	cmdline = 'softsan '+cmdline
 	sys.argv = cmdline.split()
-	print sys.argv
 	cmds, remains = config.config(commands, None)
 	print cmds
 	print remains
@@ -149,68 +154,63 @@ def ParseCMD(action, cmdline):
 		print ''
 		return
 
-	#getattr(client, func+'Volume')(data)
+	print_data(data)
+	getattr(client, func+'Volume')(data)
 
 
 def ParseArg():
 	conf,_ = config.config(argstruct, 'client')
-	# if conf['mdsaddress'] != True:
-	# 	print >>sys.stderr,  'metadata server address must be specified'
-	# 	exit(-1)
-	# if conf['mdsport'] != True:
-	# 	print >>sys.stderr, 'metadata server service port must be specified'
-	# 	exit(-1)
 	util.setupLogging(conf)
-
-	#client = Client.Client(conf['mdsaddress'], conf['mdsport'])
-	cli = CLI()
+	client = Client.Client(conf['mdsaddress'], int(conf['mdsport']))
+	cli = CLI(client)
 	cli.cmdloop()
-	#client.Clear()
+	client.Clear()
 
 
 class CLI(cmd.Cmd):
-	def __init__(self):
+	def __init__(self, client):
 		cmd.Cmd.__init__(self)
 		self.prompt = 'softsan# '
+		self.client = client
 
 	def do_create(self, line):
-		ParseCMD('create', line)
+		ParseCMD(self.client, 'create', line)
 
 	def help_test(self):
 		print 'create a new volume'
 
 	def do_remove(self, line):
-		ParseCMD('remove', line)
+		ParseCMD(self.client, 'remove', line)
 
 	def help_remove(self):
 		print 'remove volume'
 
 	def do_list(self, line):
-		ParseCMD('list', line)
+		ParseCMD(self.client, 'list', line)
 
 	def help_list(self):
 		print 'list volume'
 
 	def do_ls(self, line):
-		ParseCMD('list', line)
+		ParseCMD(self.client, 'list', line)
 
 	def help_ls(self):
 		print 'list volume'
 
 	def do_split(self, line):
-		ParseCMD('split', line)
+		ParseCMD(self.client, 'split', line)
 
 	def help_split(self):
 		print 'split a volume into subvolume(s)'
 
 	def do_mount(self, line):
-		ParseCMD('mount', line)
+		ParseCMD(self.client, 'mount', line)
 
 	def help_mount(self):
 		print 'mount volume'
 
 	def do_unmount(self, line):
-		ParseCMD('unmount', line)
+		ParseCMD(self.client, 'unmount', line)
 
 	def help_unmount(self):
 		print 'unmount volume'
@@ -221,14 +221,7 @@ class CLI(cmd.Cmd):
 	def help_exit(self):
 		print 'exit program'
 
-def test():
-	sys.argv = 'softsan-cli.py -a 192.168.0.12'.split()
-	# sys.argv = 'create no1 60 striped 2'.split()
-	# sys.argv = 'softsan-cli.py --info no1'.split()
-	# sys.argv = 'softsan-cli.py --unmount no1'.split()
-	# sys.argv = 'softsan-cli.py --mount no1'.split()
-	# sys.argv = 'softsan-cli.py --remove no1'.split()
-	args = ParseArg()
+def print_data(args):
 	if isinstance(args, Object):
 		print args.name
 		print args.size
@@ -238,6 +231,16 @@ def test():
 		print args.parameters, len(args.parameters)
 	else:
 		print args
+
+def test():
+	sys.argv = 'softsan-cli.py -a 192.168.0.12'.split()
+	# sys.argv = 'create no1 60 striped 2'.split()
+	# sys.argv = 'softsan-cli.py --info no1'.split()
+	# sys.argv = 'softsan-cli.py --unmount no1'.split()
+	# sys.argv = 'softsan-cli.py --mount no1'.split()
+	# sys.argv = 'softsan-cli.py --remove no1'.split()
+	args = ParseArg()
+	print_data(args)
 
 if __name__=='__main__':
 	#test()
