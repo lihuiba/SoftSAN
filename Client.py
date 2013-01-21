@@ -15,15 +15,6 @@ from ClientDeamon import DMClient
 from collections import Iterable
 import util, config
 
-#branches of volume tree
-#vertical, up and right, vertical and right, horizontal, horizontal and down
-branch = [
-		'\342\224\202',\
-		'\342\224\224',\
-		'\342\224\234',\
-		'\342\224\200',\
-		'\342\224\254' \
-]
 
 #default chunk size
 CHUNKSIZE = 64
@@ -39,8 +30,6 @@ class MDSClient:
 		if count:
 			arg.randomCount = count
 		ret = self.stub.callMethod('GetChunkServers', arg)
-		print '---------------------------------------------------'
-		print 'length: ', len(ret.random)
 		serverlist=[msg2obj(x) for x in ret.random]
 		return serverlist
 
@@ -62,20 +51,10 @@ class MDSClient:
 		req.fullpath = '/'+path
 		ret = self.stub.callMethod('DeleteVolume', req)
 
-	def ReadVolumeInfo(self, name):
-		if isinstance(name, str):
-			path = name
-		else:
-			path = Guid.toStr(name)
+	def ReadVolumeInfo(self, volume_name):
 		req = msg.ReadVolume_Request()
-		req.fullpath = '/'+path
-		try:
-			ret = self.stub.callMethod('ReadVolume', req)
-		except Exception as ex:
-			index = str(ex).find(path)
-			if index > -1:
-				return None
-			logging.error(str(ex))
+		req.fullpath = '/'+volume_name
+		ret = self.stub.callMethod('ReadVolume', req)
 		volume = msg.Volume()
 		volume.ParseFromString(ret.volume)
 		return msg2obj(volume)
@@ -84,7 +63,13 @@ class MDSClient:
 		req = msg.MoveVolume_Request()
 		req.source = source
 		req.destination = dest
-		ret = self.stub.callMethod('MoveVolume', req)
+		self.stub.callMethod('MoveVolume', req)
+
+	def ListDirectory(self, fullpath):
+		req = msg.ListDirectory_Request()
+		req.fullpath = fullpath
+		ret = self.stub.callMethod('ListDirectory', req)
+		return ret.items
 
 
 class ChunkServerClient:
@@ -208,7 +193,10 @@ class Client:
 		if not node == None:
 			try:
 				node.login()
+			## FIXME, find out the type of exception
 			except Exception as ex:
+				print '-----------error type-----------------'
+				print type(ex)
 				ex_str = str(ex)
 				index = ex_str.find('session exists')
 				if index == -1:
@@ -216,7 +204,6 @@ class Client:
 					return None, None
 				else:
 					logging.warn('chunk '+node.name+' is already mounted')
-					print 'chunk '+node.name+' is already mounted'
 			dev = scandev.get_blockdev_by_targetname(node.name)
 			if not dev == None:
 				return dev, node.name
@@ -293,17 +280,8 @@ class Client:
 			self.mds.WriteVolumeInfo(subvol)
 		return True
 
-	def CreateVolume(self, arg):
+	def CreateVolume(self, volname, volsize, voltype, chksizes, volnames, params):
 		vollist = []
-		volume = Object()
-
-		volname = arg.name
-		volsize = arg.size
-		voltype = arg.type
-		chksizes = arg.chunksizes
-		volnames = arg.subvolumes
-		params = arg.parameters
-
 		if len(volnames) > 0:
 			for name in volnames:
 				vol = self.mds.ReadVolumeInfo(name)
@@ -311,8 +289,10 @@ class Client:
 					logging.error('Volume does not exist: '+name)
 					return False
 				if vol.parameters[2] == 'used':
-					print 'volume '+name+' has been used'
+					logging.error('volume '+name+' has been used')
 					return False
+				if vol.parameters[3] == 'inactive':
+					self.MountVolume(name)
 				vollist.append(vol)
 		
 		if len(chksizes) == 0 and len(volnames) == 0:
@@ -337,12 +317,12 @@ class Client:
 				return False
 			# for vol in vollist:
 			# 	print 'vol.size: ', vol.size
-
+		volume = Object()
 		volume.size = volsize
 		volume.assembler = voltype
 		volume.subvolumes = vollist
 		volume.guid = Guid.toStr(Guid.generate())
-		volume.parameters = [volname, '/dev/mapper/'+volname, 'free']
+		volume.parameters = [volname, '/dev/mapper/'+volname, 'free', 'active']
 		volume.parameters.extend(params)
 
 		ret = self.dmclient.MapVolume(volume)
@@ -354,21 +334,21 @@ class Client:
 			return False
 
 		self.mds.WriteVolumeInfo(volume)
-		if len(volnames) > 0:
-			for vol in vollist:
+		for vol in vollist:
+			if vol.assembler != 'chunk':
 				vol.parameters[2] = 'used'
-				self.mds.WriteVolumeInfo(vol)
+				vol.parameters[3] = 'active'
+			self.mds.WriteVolumeInfo(vol)
 
+		logging.info('Volume '+volname+' created successfully')
 		return True			
  
-	def DeleteVolume(self, name):
-		volume = self.mds.ReadVolumeInfo(volume)
+	def DeleteVolume(self, volume_name):
+		volume = self.mds.ReadVolumeInfo(volume_name)
 		if isinstance(volume, type(None)):
 			logging.error('Volume does not exist'+volume)
 			return False
-		if isinstance(name, Object):
-			name = name.parameters[0]
-		self.DeleteVolumeTree(name)
+		self.DeleteVolumeTree(volume_name)
 		self.dmclient.DeleteVolume(volume)
 
 	def DeleteVolumeTree(self, volume):
@@ -378,6 +358,7 @@ class Client:
 			chkclient = self.chkpool.get(self.guid, addr, port)
 			self.UnmountChunk(volume)
 			chkclient.DeleteChunk(volume)
+			self.mds.DeleteVolumeInfo(volume)
 			return True
 		for subvolume in volume.subvolumes:
 			if self.DeleteVolumeTree(subvolume) == False:
@@ -385,45 +366,22 @@ class Client:
 		self.mds.DeleteVolumeInfo(volume)
 		return True
 
-	def ListVolume(self, data):
-		volume = self.mds.ReadVolumeInfo(data.name)
-		if isinstance(volume, type(None)):
-			logging.error('Volume does not exist'+data.name)
-			return False
-		space = '      '
-		print 'name:', space, volume.parameters[0]
-		print 'path:', space, volume.parameters[1]
-		print 'size:', space, volume.size, 'MB'
-		if data.tree == '1':
-			self.print_tree(volume, '')
-
-	def print_tree(self, volume, prefix):
-		print os.path.basename(volume.parameters[1])
-		if hasattr(volume, 'subvolumes'):
-			num = len(volume.subvolumes)
-		else:
-			num = 0
-		i = 0
-		for i in range(0, num):
-			if i == num-1:
-				print prefix+' '+branch[1],
-				add = '  '
-			else:
-				print prefix+' '+branch[2],
-				add = ' '+branch[0]
-			self.print_tree(volume.subvolumes[i], prefix+add)
-
 	def RestoreVolume(self):
 		mplist = dm.maps()
 		for mp in mplist:
 			volume = self.mds.ReadVolumeInfo(mp.name)
-			if not isinstance(volume, type(None)):
+			if not ivolume == None:
 				self.MountVolume(volume)
 
+	def Clear(self):
+		pass
 
 def test():
 	global PARAM
-	client = Client(Mds_IP, int(Mds_Port))
+	client = Client('0.0.0.0', 22136)
+	items = client.mds.ListDirectory('/')
+	for item in items:
+		print item
 	#client.ListVolume('hello_softsan_striped')
 
 	# create a stiped type volume

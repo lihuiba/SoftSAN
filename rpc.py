@@ -126,6 +126,7 @@ class RpcStub:
 		assert token==self.token
 		if name_=='Exception':
 			exception=pickle.loads(body_)
+			#print type(exception)
 			raise exception
 		assert name_==name
 		self.token=token+1

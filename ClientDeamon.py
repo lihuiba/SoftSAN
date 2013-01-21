@@ -94,8 +94,8 @@ class DMClient:
 		if dmtype == 'linear':
 			result = self.MapLinearVolume(volumename, volume.subvolumes)
 		elif dmtype == 'striped':
-			if len(volume.parameters) > 3:
-				stripedsize = int(volume.parameters[3])
+			if len(volume.parameters) > 4:
+				stripedsize = int(volume.parameters[4])
 			else:
 				stripedsize = 256
 			result = self.MapStripedVolume(volumename, stripedsize, volume.subvolumes)

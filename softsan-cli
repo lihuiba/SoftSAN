@@ -6,14 +6,24 @@ from mds import Object
 
 CHUNKSIZE = 64
 
+#branches of volume tree
+#vertical, up and right, vertical and right, horizontal, horizontal and down
+branch = [
+		'\342\224\202',\
+		'\342\224\224',\
+		'\342\224\234',\
+		'\342\224\200',\
+		'\342\224\254' \
+]
 
-commands=(\
+cmdstruct=(\
 	('name',	'n',	'',			'create a volume'),\
 	('params',  'p',	'',			'volume parameters'),\
 	('size',	's',	'',			'remove a volume'),\
 	('count',	'c', 	'0',		'list object information'),\
 	('type',	't', 	'linear',	'split a volume into subvolumes'),\
 	('tree',	'', 	'0',		'list object information'),\
+	('all',		'a', 	'0',		'all of the volumes or not'),\
 	('help',	'h',	False,		'this help'),\
 )
 argstruct=(\
@@ -25,20 +35,30 @@ argstruct=(\
 	('help',			'h',		False,				'this help'),\
 )
 
-
-def ListVolume(self, data):
-	volume = self.mds.ReadVolumeInfo(data.name)
-	if isinstance(volume, type(None)):
-		logging.error('Volume does not exist'+data.name)
+def ListVolume(mds, volume_name, tree):
+	if volume_name == '':
+		volumes = mds.ListDirectory('/')
+		for volume in volumes:
+			if not ListVolume(mds, volume.name, tree):
+				return False
+		return True
+	try:
+		volume = mds.ReadVolumeInfo(volume_name)
+	except IOError:
+		print >>sys.stderr,'Volume '+volume_name+' does not exist'
 		return False
 	space = '      '
-	print 'name:', space, volume.parameters[0]
-	print 'path:', space, volume.parameters[1]
-	print 'size:', space, volume.size, 'MB'
-	if data.tree == '1':
-		self.print_tree(volume, '')
+	print 'Name:', space, volume.parameters[0]
+	print 'Path:', space, volume.parameters[1]
+	print 'Type:', space, volume.assembler
+	print 'Size:', space, volume.size, 'MB'
+	print 'Status:', space
+	print 'Number of subvolumes:', space, len(volume.subvolumes)
+	if tree == '1':
+		print_tree(volume, '')
+	return True
 
-def print_tree(self, volume, prefix):
+def print_tree(volume, prefix):
 	print os.path.basename(volume.parameters[1])
 	if hasattr(volume, 'subvolumes'):
 		num = len(volume.subvolumes)
@@ -52,7 +72,7 @@ def print_tree(self, volume, prefix):
 		else:
 			print prefix+' '+branch[2],
 			add = ' '+branch[0]
-		self.print_tree(volume.subvolumes[i], prefix+add)
+		print_tree(volume.subvolumes[i], prefix+add)
 
 def ParseTable(args, subvolumes):
 	ret = Object()
@@ -64,33 +84,34 @@ def ParseTable(args, subvolumes):
 	ret.parameters = []
 	tableFormat = 'name size [type] [num] [sizes|volumenames]'
 	if args.name == '':
-		print >>sys.stderr, 'volume name must be specified'
+		print >>sys.stderr,'volume name must be specified'
 		return None
 	ret.name = args.name
 	if args.size.isdigit() == False:
-		print >>sys.stderr, 'volume size must be digit'
+		print >>sys.stderr,'volume size must be digit'
 		return None
 	if args.size != '':
 		ret.size = int(args.size)
 	if args.type != 'linear' and args.type != 'striped' and\
 	   args.type != 'mirror' and args.type != 'gfs':
-		print >>sys.stderr, 'volume type can only be linear/striped/mirror/gfs'
+		print >>sys.stderr,'volume type can only be linear/striped/mirror/gfs'
 		return None
+	ret.type = args.type
 	if args.params != '':
 		if args.type != 'striped':
-			print 'warning: not need parameters'
+			print >>sys.stdwar,'does not need parameters'
 		else:
 			strsize = int(args.params)
 			if strsize != 256 and strsize != 512 and strsize != 1024 and strsize != 2048:
-				print >>sys.stderr, 'stripe size only can be: 256/512/1024/2048'
+				print >>sys.stderr,'stripe size only can be: 256/512/1024/2048'
 				return None
 			ret.parameters.append(args.params)
 	if args.count.isdigit() == False:
-		print >>sys.stderr, 'count must be digit'
+		print >>sys.stderr,'count must be digit'
 		return None
 	count = int(args.count)
 	if count < 0:
-		print >>sys.stderr, 'count must not be negative'
+		print >>sys.stderr,'count must not be negative'
 		return None
 	if count == 0:
 		if ret.type == 'linear' or ret.type == 'gfs':
@@ -108,7 +129,7 @@ def ParseTable(args, subvolumes):
 		if num == 0:
 			chksize = ret.size/count
 			if chksize < 4:
-				print >>sys.stderr, 'too many chunks, single chunk size too samll'
+				print >>sys.stderr,'too many chunks, single chunk size too samll'
 				return None
 			totsize = ret.size
 			while totsize > chksize:
@@ -118,21 +139,21 @@ def ParseTable(args, subvolumes):
 				ret.chunksizes.append(totsize)
 			return ret
 		if num != count:
-			print >>sys.stderr, 'incorrect arguments count'
+			print >>sys.stderr,'incorrect arguments count'
 			return None
 		if subvolumes[0].isdigit() == True:
 			totsize = 0
 			for i in range(0, count):
 				if subvolumes[i].isdigit() == False:
-					print >>sys.stderr, 'chunk size must be digit'
+					print >>sys.stderr,'chunk size must be digit'
 					return None
 				ret.chunksizes.append(int(subvolumes[i]))
 				totsize += int(int(subvolumes[i]))
 			if totsize > ret.size:
-				print >>sys.stderr, 'chunk size summary is larger than voluem size'
+				print >>sys.stderr,'chunk size summary is larger than voluem size'
 				return None
 			if totsize < ret.size:
-				print >>sys.stdwar, 'warning: chunk size summary is less than voluem size'
+				print >>sys.stdwar,'warning: chunk size summary is less than voluem size'
 			remain = ret.size-totsize
 			while remain > CHUNKSIZE:
 				ret.chunksizes.append(CHUNKSIZE)
@@ -142,50 +163,6 @@ def ParseTable(args, subvolumes):
 		else:
 			ret.subvolumes = subvolumes
 	return ret
-
-def ParseCMD(client, action, cmdline):
-	cmdline = 'softsan '+cmdline
-	sys.argv = cmdline.split()
-	cmds, remains = config.config(commands, None)
-	print cmds
-	print remains
-	cmds = Object(cmds)
-
-	if action == 'create':
-		name = cmds.name
-		data = ParseTable(cmds, remains)
-		if isinstance(data, type(None)):
-			return
-		remains = []
-		func = 'Create'
-	elif action == 'remove':
-		data = cmds.name
-		func = 'Delete'
-	elif action == 'list' or action == 'ls':
-		data = Object()
-		data.tree = cmds.tree
-		data.name = cmds.name
-		func = 'List'
-	elif action == 'split':
-		data = cmds.name
-		func = 'split'
-	elif action == 'mount':
-		data = cmds.name
-		func = 'Mount'
-	elif action == 'unmount':
-		data = cmds.name
-		func = 'Unmount'
-
-	if len(remains)>0:
-		print >>sys.stderr, 'Invalid arguments: ',
-		for i in remains:
-			print i,
-		print ''
-		return
-
-	print_data(data)
-	getattr(client, func+'Volume')(data)
-
 
 def ParseArg():
 	conf,_ = config.config(argstruct, 'client')
@@ -202,51 +179,71 @@ class CLI(cmd.Cmd):
 		self.prompt = 'softsan# '
 		self.client = client
 
-	def do_create(self, line):
-		ParseCMD(self.client, 'create', line)
+	def get_params(self, cmdline):
+		cmdline = 'softsan '+cmdline
+		sys.argv = cmdline.split()
+		params, remains = config.config(cmdstruct, None)
+		return Object(params), remains
 
-	def help_test(self):
+	def check_remains(self, remains):
+		if len(remains) > 0:
+			print >>sys.stderr,'Unrecongnized arguments: ',
+			for arg in remains:
+				print arg,
+			print ''
+			return False
+		return True
+
+	def do_create(self, cmdline):
+		params, remains = self.get_params(cmdline)
+		ret = ParseTable(params, remains)
+		if ret == None:
+			return
+		self.client.CreateVolume(ret.name, ret.size, ret.type, ret.chunksizes,\
+								 ret.subvolumes, ret.parameters)
+	def help_create(self):
 		print 'create a new volume'
 
-	def do_remove(self, line):
-		ParseCMD(self.client, 'remove', line)
-
+	def do_remove(self, cmdline):
+		params,remains = self.get_params(cmdline)
+		self.client.DeleteVolume(params.name)
 	def help_remove(self):
 		print 'remove volume'
 
-	def do_list(self, line):
-		ParseCMD(self.client, 'list', line)
-
+	def do_list(self, cmdline):
+		params,remains = self.get_params(cmdline)
+		if self.check_remains(remains):
+			ListVolume(self.client.mds, params.name, params.tree)
 	def help_list(self):
 		print 'list volume'
 
-	def do_ls(self, line):
-		ParseCMD(self.client, 'list', line)
-
+	def do_ls(self, cmdline):
+		self.do_list(cmdline)
 	def help_ls(self):
 		print 'list volume'
 
-	def do_split(self, line):
-		ParseCMD(self.client, 'split', line)
-
+	def do_split(self, cmdline):
+		params,remains = self.get_params(cmdline)
+		if self.check_remains(remains):
+			self.client.SplitVolume(params.name)
 	def help_split(self):
 		print 'split a volume into subvolume(s)'
 
-	def do_mount(self, line):
-		ParseCMD(self.client, 'mount', line)
-
+	def do_mount(self, cmdline):
+		params,remains = self.get_params(cmdline)
+		if self.check_remains(remains):
+			self.client.MountVolume(params.name)
 	def help_mount(self):
 		print 'mount volume'
 
-	def do_unmount(self, line):
-		ParseCMD(self.client, 'unmount', line)
-
+	def do_unmount(self, cmdline):
+		params,_ = self.get_params(cmdline)
+		self.client.UnmountVolume(params.name)
 	def help_unmount(self):
 		print 'unmount volume'
 
-	def do_exit(self, line):
+	def do_exit(self, cmdline):
 		exit(0)
-
 	def help_exit(self):
 		print 'exit program'
 
