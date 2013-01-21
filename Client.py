@@ -86,9 +86,6 @@ class MDSClient:
 		req.destination = dest
 		ret = self.stub.callMethod('MoveVolume', req)
 
-	def Clear(self):
-		self.socket.close()
-
 
 class ChunkServerClient:
 	
@@ -97,12 +94,13 @@ class ChunkServerClient:
 		self.endpoint=(csip, csport)
 	
 	def getStub(self):
-		if hasattr(self, 'stub'):
-			return self.stub
 		self.socket = gevent.socket.socket()
 		self.socket.connect(self.endpoint)
 		stub=rpc.RpcStub(self.guid, self.socket, ChunkServer.ChunkServer)
 		self.stub=stub
+		def getStub_New(self):
+			return self.stub
+		self.getStub=getStub_New
 		return stub
 
 	def NewChunk(self, size, count = 1):
@@ -143,12 +141,13 @@ class ChunkServerClient:
 
 	def Clear(self):
 		self.socket.close()
+		del self.getStub
+		del self.socket
+		del self.stub
 
 
 class Client:
 	def __init__(self, mdsip, mdsport):
-		logging.basicConfig(level=logging.ERROR)
-
 		self.guid = Guid.generate()
 		self.chkpool = Pool(ChunkServerClient, ChunkServerClient.Clear)
 		self.mds = MDSClient(self.guid, mdsip, mdsport)
@@ -156,7 +155,7 @@ class Client:
 		#self.RestoreVolumeInfo()
 		
 	# give a list of chunk sizes, return a list of volumes
-    # volume : path node msg.volume
+	# volume : path node msg.volume
 	def NewChunkList(self, chksizes):
 		volumelist = []
 		
@@ -419,11 +418,6 @@ class Client:
 			volume = self.mds.ReadVolumeInfo(mp.name)
 			if not isinstance(volume, type(None)):
 				self.MountVolume(volume)
-
-	def Clear(self):
-		self.socket.close()
-		self.mds.Clear()
-		self.chkpool.dispose()
 
 
 def test():
