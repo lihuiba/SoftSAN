@@ -39,6 +39,8 @@ class MDSClient:
 		if count:
 			arg.randomCount = count
 		ret = self.stub.callMethod('GetChunkServers', arg)
+		print '---------------------------------------------------'
+		print 'length: ', len(ret.random)
 		serverlist=[msg2obj(x) for x in ret.random]
 		return serverlist
 
@@ -151,10 +153,6 @@ class Client:
 		self.chkpool = Pool(ChunkServerClient, ChunkServerClient.Clear)
 		self.mds = MDSClient(self.guid, mdsip, mdsport)
 		self.dmclient = DMClient()
-		self.socket = gevent.socket.socket()
-		self.socket.connect(('192.168.0.12', 6767))
-		self.stub = rpc.RpcStub(self.guid, self.socket, ClientDeamon.ClientDeamon)
-
 		#self.RestoreVolumeInfo()
 		
 	# give a list of chunk sizes, return a list of volumes
@@ -162,7 +160,10 @@ class Client:
 	def NewChunkList(self, chksizes):
 		volumelist = []
 		
-		serlist = self.mds.GetChunkServers()
+		serlist = self.mds.GetChunkServers(5)
+		if len(serlist) == 0:
+			logging.error('Currently not ChunkServer is available')
+			return None
 
 		for size in chksizes:
 			server = serlist[0]
@@ -241,7 +242,7 @@ class Client:
 			return False
 		if self.MountVolumeTree(volume) == False:
 			return False
-		if self.dmclient.MountVolume(volume) == False
+		if self.dmclient.MountVolume(volume) == False:
 			return False
 		return True
 
@@ -312,8 +313,6 @@ class Client:
 				if vol.parameters[2] == 'used':
 					print 'volume '+name+' has been used'
 					return False
-				if vol == None:
-					return False
 				vollist.append(vol)
 		
 		if len(chksizes) == 0 and len(volnames) == 0:
@@ -322,9 +321,6 @@ class Client:
 				chksizes.append(CHUNKSIZE)
 				totsize -= CHUNKSIZE
 			chksizes.append(totsize)
-
-		if voltype == '':
-			voltype = 'linear'
 
 		if voltype == 'gfs':
 			temlist = []
@@ -337,10 +333,10 @@ class Client:
 		if len(chksizes) > 0:
 			vollist = self.NewChunkList(chksizes)
 			if vollist == None:
-				logging.error('New Chunk failed')
+				logging.error('New Chunk(s) failed')
 				return False
-			for vol in vollist:
-				print 'vol.size: ', vol.size
+			# for vol in vollist:
+			# 	print 'vol.size: ', vol.size
 
 		volume.size = volsize
 		volume.assembler = voltype
@@ -350,8 +346,8 @@ class Client:
 		volume.parameters.extend(params)
 
 		ret = self.dmclient.MapVolume(volume)
-		if ret == False:
-			logging.error('Map volume failed')
+		if ret != '':
+			logging.error('create volume failed')
 			if volume.subvolumes[0].assembler == 'chunk':
 				for subvol in volume.subvolumes:
 					self.DeleteVolumeTree(subvol)
@@ -361,9 +357,9 @@ class Client:
 		if len(volnames) > 0:
 			for vol in vollist:
 				vol.parameters[2] = 'used'
-		for vol in vollist:
-			self.mds.WriteVolumeInfo(vol)
-		return True
+				self.mds.WriteVolumeInfo(vol)
+
+		return True			
  
 	def DeleteVolume(self, name):
 		volume = self.mds.ReadVolumeInfo(volume)
@@ -417,7 +413,7 @@ class Client:
 				add = ' '+branch[0]
 			self.print_tree(volume.subvolumes[i], prefix+add)
 
-	def RestoreVolumeInfo(self):
+	def RestoreVolume(self):
 		mplist = dm.maps()
 		for mp in mplist:
 			volume = self.mds.ReadVolumeInfo(mp.name)
