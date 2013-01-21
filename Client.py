@@ -92,15 +92,16 @@ class ChunkServerClient:
 	def __init__(self, guid, csip, csport):
 		self.__class__.guid=guid
 		self.endpoint=(csip, csport)
+
+	def getStub_New(self):
+		return self.stub
 	
 	def getStub(self):
 		self.socket = gevent.socket.socket()
 		self.socket.connect(self.endpoint)
 		stub=rpc.RpcStub(self.guid, self.socket, ChunkServer.ChunkServer)
 		self.stub=stub
-		def getStub_New(self):
-			return self.stub
-		self.getStub=getStub_New
+		self.getStub=self.getStub_New
 		return stub
 
 	def NewChunk(self, size, count = 1):
