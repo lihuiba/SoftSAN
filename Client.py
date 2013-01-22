@@ -43,10 +43,7 @@ class MDSClient:
 		ret = self.stub.callMethod('WriteVolume', req)
 
 	def DeleteVolumeInfo(self, volume):
-		if isinstance(volume, str):
-			path = volume
-		else:
-			path = volume.parameters[0]
+		path = volume.parameters[0]
 		req = msg.DeleteVolume_Request()
 		req.fullpath = '/'+path
 		ret = self.stub.callMethod('DeleteVolume', req)
@@ -138,7 +135,7 @@ class Client:
 		self.chkpool = Pool(ChunkServerClient, ChunkServerClient.Clear)
 		self.mds = MDSClient(self.guid, mdsip, mdsport)
 		self.dmclient = DMClient()
-		#self.RestoreVolumeInfo()
+		#self.CheckVolume()
 		
 	# give a list of chunk sizes, return a list of volumes
 	# volume : path node msg.volume
@@ -190,7 +187,7 @@ class Client:
 		chkclient = self.chkpool.get(self.guid, addr, port)
 		target = chkclient.AssembleChunk(volume)
 		node = self.GetChunkNode(target.access_point, addr)
-		if not node == None:
+		if node != None:
 			try:
 				node.login()
 			## FIXME, find out the type of exception
@@ -205,7 +202,7 @@ class Client:
 				else:
 					logging.warn('chunk '+node.name+' is already mounted')
 			dev = scandev.get_blockdev_by_targetname(node.name)
-			if not dev == None:
+			if dev != None:
 				return dev, node.name
 		return None, None
 
@@ -215,28 +212,39 @@ class Client:
 		nodename = volume.parameters[2]
 		node = self.GetChunkNode(nodename, addr)
 		if node == None:
+			logging.error('Could not find iscsi node to unmount')
 			return False
 		node.logout()
 		chkclient = self.chkpool.get(self.guid, addr, port)
 		if chkclient.DisassembleChunk(nodename) == False:
 			return False
 		return True
-		
+	
+	def ChangeVolumeStatus(self, volume, status):
+		if volume.assembler == 'chunk':
+			return
+		volume.parameters[3] = status
+		for subvol in volume.subvolumes:
+			self.ChangeVolumeStatus(subvol, status)
+		self.mds.WriteVolumeInfo(volume)
+
 	def MountVolume(self, volume_name):
-		volume = self.mds.ReadVolumeInfo(volume_name)
-		if isinstance(volume, type(None)):
-			logging.error('Volume does not exist: '+volume_name)
+		try:
+			volume = self.mds.ReadVolumeInfo(volume_name)
+		except IOError:
+			logging.error('Volume '+volume_name+' does not exist')
 			return False
 		if self.MountVolumeTree(volume) == False:
 			return False
 		if self.dmclient.MountVolume(volume) == False:
 			return False
+		self.ChangeVolumeStatus(volume, 'active')
 		return True
 
 	def MountVolumeTree(self, volume):
 		if volume.assembler == 'chunk':
-			ret = self.MountChunk(volume)
-			if ret[0] == None:
+			ret,_ = self.MountChunk(volume)
+			if ret == None:
 				return False
 			return True
 		for subvol in volume.subvolumes:
@@ -245,14 +253,16 @@ class Client:
 		return True
 
 	def UnmountVolume(self, volume_name):
-		volume = self.mds.ReadVolumeInfo(volume_name)
-		if isinstance(volume, type(None)):
-			logging.error('Volume does not exist: '+volume_name)
-			return False
-		if self.dmclient.DeleteVolume(volume) == False:
+		try:
+			volume = self.mds.ReadVolumeInfo(volume_name)
+		except IOError:
+			logging.error('Volume '+volume_name+' does not exist')
 			return False
 		if self.UnmountVolumeTree(volume) == False:
 			return False
+		if self.dmclient.DeleteVolume(volume) == False:
+			return False
+		self.ChangeVolumeStatus(volume, 'active')
 		return True
 
 	def UnmountVolumeTree(self, volume):
@@ -263,10 +273,11 @@ class Client:
 				return False
 		return True
 
-	def SplitVolume(self, volumename):
-		volume = self.mds.ReadVolumeInfo(volumename)
-		if isinstance(volume, type(None)):
-			logging.error('Volume does not exist: '+volumename)
+	def SplitVolume(self, volume_name):
+		try:
+			volume = self.mds.ReadVolumeInfo(volume_name)
+		except IOError:
+			logging.error('Volume '+volume_name+' does not exist')
 			return False
 		if volume.subvolumes[0].assembler == 'chunk':
 			logging.error('This volume is not divisible!')
@@ -284,15 +295,20 @@ class Client:
 		vollist = []
 		if len(volnames) > 0:
 			for name in volnames:
-				vol = self.mds.ReadVolumeInfo(name)
-				if isinstance(vol, type(None)):
-					logging.error('Volume does not exist: '+name)
+				try:
+					volume = self.mds.ReadVolumeInfo(name)
+				except IOError:
+					logging.error('Volume '+name+' does not exist')
 					return False
 				if vol.parameters[2] == 'used':
 					logging.error('volume '+name+' has been used')
 					return False
 				if vol.parameters[3] == 'inactive':
-					self.MountVolume(name)
+					logging.warn('Volume '+name+' is inactive')
+					logging.warn('Mounting volume '+name)
+					if not self.MountVolume(name):
+						logging.error('Mount volume '+name+' failed')
+						return False
 				vollist.append(vol)
 		
 		if len(chksizes) == 0 and len(volnames) == 0:
@@ -325,9 +341,8 @@ class Client:
 		volume.parameters = [volname, '/dev/mapper/'+volname, 'free', 'active']
 		volume.parameters.extend(params)
 
-		ret = self.dmclient.MapVolume(volume)
-		if ret != '':
-			logging.error('create volume failed')
+		if self.dmclient.MapVolume(volume) == False:
+			logging.error('device mapper: create volume '+volname+' failed')
 			if volume.subvolumes[0].assembler == 'chunk':
 				for subvol in volume.subvolumes:
 					self.DeleteVolumeTree(subvol)
@@ -340,16 +355,19 @@ class Client:
 				vol.parameters[3] = 'active'
 			self.mds.WriteVolumeInfo(vol)
 
-		logging.info('Volume '+volname+' created successfully')
 		return True			
  
 	def DeleteVolume(self, volume_name):
-		volume = self.mds.ReadVolumeInfo(volume_name)
-		if isinstance(volume, type(None)):
-			logging.error('Volume does not exist'+volume)
+		try:
+			volume = self.mds.ReadVolumeInfo(volume_name)
+		except IOError:
+			logging.error('Volume '+volume_name+' does not exist')
 			return False
-		self.DeleteVolumeTree(volume_name)
-		self.dmclient.DeleteVolume(volume)
+		if self.DeleteVolumeTree(volume_name) == False:
+			return False
+		if self.dmclient.DeleteVolume(volume) == False:
+			return False
+		return True
 
 	def DeleteVolumeTree(self, volume):
 		if volume.assembler == 'chunk':
@@ -366,12 +384,19 @@ class Client:
 		self.mds.DeleteVolumeInfo(volume)
 		return True
 
-	def RestoreVolume(self):
-		mplist = dm.maps()
-		for mp in mplist:
-			volume = self.mds.ReadVolumeInfo(mp.name)
-			if not ivolume == None:
-				self.MountVolume(volume)
+	def CheckVolume(self):
+		volumes = self.mds.ListDirectory('/')
+		for vol in volumes:
+			if self.dmclient.GetVolumeMap(vol.name) == None:
+				status = 'inactive'
+			else:
+				status = 'active'
+			volume = self.mds.ReadVolumeInfo(vol.name)
+			volume_status = volume.parameters[3]
+			if volume_status != status:
+				volume.parameters[3] = status
+				self.mds.WriteVolumeInfo(volume)
+
 
 	def Clear(self):
 		pass

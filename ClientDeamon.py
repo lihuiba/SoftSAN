@@ -89,8 +89,6 @@ class DMClient:
 		size = volume.size
 		dmtype = volume.assembler
 
-		logging.info('device mapper: mapping volume: '+volume.parameters[0])
-
 		if dmtype == 'linear':
 			result = self.MapLinearVolume(volumename, volume.subvolumes)
 		elif dmtype == 'striped':
@@ -104,13 +102,7 @@ class DMClient:
 		elif dmtype == 'gfs':
 			result = self.MapGFSVolume(volumename, volume.subvolumes)
 
-		error = ''
-		if result == False:
-			ret.error = 'device mapper: map volume {0} failed'.format(volumename)
-			logging.error(ret.error)
-			return error
-
-		return error
+		return result
 
 	def SplitVolume(self, volume_name):
 		mp = self.GetVolumeMap(volume_name)
@@ -128,35 +120,26 @@ class DMClient:
 		for subvol in volume.subvolumes:
 			if self.MountVolume(subvol) == False:
 				return False
+		if self.MapVolume(volume) == False:
+			return False
 		return True
 
 	def DeleteVolume(self, volume):
 		if volume.assembler == 'chunk':
 			return True
 		mp = self.GetVolumeMap(volume.parameters[0])
-		try:
-			mp.remove()
-		except Exception as ex:
-			logging.error('device mapper: removing volume {0} failed'.format(volume.parameters[0]))
-			logging.error(str(ex))   
+		if mp == None:
+			logging.error('device mapper: could not find volume map')
 			return False
+		mp.remove()
 		for subvolume in volume.subvolumes:
-			if self.DeleteVolume(subvolume.parameters[0]) == False:
+			if self.DeleteVolume(subvolume) == False:
 				return False
 		return True
 
-	def GetVolumeMap(name):
+	def GetVolumeMap(self, name):
 		mps = dm.maps()
 		for mp in mps:
 			if name == mp.name:
 				return mp
 		return None
-		
-
-# if __name__=='__main__':
-# 	logging.basicConfig(level=logging.DEBUG)
-
-# 	server=ClientDeamon()
-# 	service=rpc.RpcService(server)
-# 	framework=gevent.server.StreamServer(('0.0.0.0', 6767), service.handler)
-# 	framework.serve_forever()

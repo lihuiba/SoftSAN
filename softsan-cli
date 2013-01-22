@@ -47,15 +47,15 @@ def ListVolume(mds, volume_name, tree):
 	except IOError:
 		print >>sys.stderr,'Volume '+volume_name+' does not exist'
 		return False
-	space = '      '
-	print 'Name:', space, volume.parameters[0]
-	print 'Path:', space, volume.parameters[1]
-	print 'Type:', space, volume.assembler
-	print 'Size:', space, volume.size, 'MB'
-	print 'Status:', space
-	print 'Number of subvolumes:', space, len(volume.subvolumes)
-	if tree == '1':
-		print_tree(volume, '')
+	if volume.assembler != 'chunk':
+		print 'Name:			',volume.parameters[0]
+		print 'Path:			',volume.parameters[1]
+		print 'Type:			',volume.assembler
+		print 'Size:			',volume.size, 'MB'
+		print 'Status:			',volume.parameters[3]
+		print 'Number of subvolumes:	',len(volume.subvolumes)
+		if tree == '1':
+			print_tree(volume, '')
 	return True
 
 def print_tree(volume, prefix):
@@ -199,14 +199,21 @@ class CLI(cmd.Cmd):
 		ret = ParseTable(params, remains)
 		if ret == None:
 			return
-		self.client.CreateVolume(ret.name, ret.size, ret.type, ret.chunksizes,\
-								 ret.subvolumes, ret.parameters)
+		if self.client.CreateVolume(ret.name, ret.size, ret.type, ret.chunksizes,\
+								 ret.subvolumes, ret.parameters):
+			print 'Volume '+ret.name+' successfully created'
+		else:
+			print 'Create volume '+ret.name+' failed'
 	def help_create(self):
 		print 'create a new volume'
 
 	def do_remove(self, cmdline):
 		params,remains = self.get_params(cmdline)
-		self.client.DeleteVolume(params.name)
+		if self.check_remains(remains):
+			if self.client.DeleteVolume(params.name):
+				print 'Volume '+ret.name+' successfully removed'
+			else:
+				print 'Remove volume '+ret.name+' failed'
 	def help_remove(self):
 		print 'remove volume'
 
@@ -225,20 +232,30 @@ class CLI(cmd.Cmd):
 	def do_split(self, cmdline):
 		params,remains = self.get_params(cmdline)
 		if self.check_remains(remains):
-			self.client.SplitVolume(params.name)
+			if self.client.SplitVolume(params.name):
+				print 'Volume '+ret.name+' successfully splited'
+			else:
+				print 'Split volume '+ret.name+' failed'
 	def help_split(self):
 		print 'split a volume into subvolume(s)'
 
 	def do_mount(self, cmdline):
 		params,remains = self.get_params(cmdline)
 		if self.check_remains(remains):
-			self.client.MountVolume(params.name)
+			if self.client.MountVolume(params.name):
+				print 'Volume '+ret.name+' successfully mounted'
+			else:
+				print 'Mount volume '+ret.name+' failed'
 	def help_mount(self):
 		print 'mount volume'
 
 	def do_unmount(self, cmdline):
-		params,_ = self.get_params(cmdline)
-		self.client.UnmountVolume(params.name)
+		params,remains = self.get_params(cmdline)
+		if self.check_remains(remains):
+			if self.client.UnmountVolume(params.name):
+				print 'Volume '+ret.name+' successfully unmounted'
+			else:
+				print 'Unmount volume '+ret.name+' failed'
 	def help_unmount(self):
 		print 'unmount volume'
 
