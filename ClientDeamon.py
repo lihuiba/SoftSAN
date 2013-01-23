@@ -8,7 +8,6 @@ from mds import Object
 import libiscsi
 import scandev
 
-#VolumeDict = {}
 
 class DMClient:
 
@@ -21,11 +20,7 @@ class DMClient:
 			table = dm.table(start, size, 'linear', params)
 			tblist.append(table)
 			start += size
-		try:
-			dm.map(volumename, tblist)
-		except Exception as ex:
-			logging.error(str(ex))
-			return False
+		dm.map(volumename, tblist)
 		return True
 
 	def MapStripedVolume(self, volumename, strsize, devlist):
@@ -39,11 +34,7 @@ class DMClient:
 		print params
 		table = dm.table(start, size, 'striped', params)
 		tblist.append(table)
-		try:
-			dm.map(volumename, tblist)
-		except Exception as ex:
-			logging.error(str(ex))
-			return False
+		dm.map(volumename, tblist)
 		return True
 
 	def MapMirrorVolume(self, volumename, devlist):
@@ -55,11 +46,7 @@ class DMClient:
 			params += ' ' + dev.parameters[1] + ' 0'
 		table = dm.table(start, size, 'mirror', params)
 		tblist.append(table)
-		try:
-			dm.map(volumename, tblist)
-		except Exception as ex:
-			logging.error(str(ex))
-			return False
+		dm.map(volumename, tblist)
 		return True
 
 	def MapGFSVolume(self, volumename, devlist):
@@ -77,11 +64,7 @@ class DMClient:
 			tblist.append(table)
 			start += size
 			i += 3
-		try:
-			dm.map(volumename, tblist)
-		except Exception as ex:
-			logging.error(str(ex))
-			return False
+		dm.map(volumename, tblist)
 		return True
 
 	def MapVolume(self, volume):		
@@ -106,12 +89,10 @@ class DMClient:
 
 	def SplitVolume(self, volume_name):
 		mp = self.GetVolumeMap(volume_name)
-		try:
-			mp.remove()
-		except Exception as ex:
-			logging.error('device mapper: split volume {0} failed'.format(req.volume_name))
-			logging.error(str(ex))
+		if mp == None:
+			logging.error('device mapper: could not find volume map')
 			return False
+		mp.remove()
 		return True
 
 	def MountVolume(self, volume):

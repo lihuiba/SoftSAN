@@ -24,6 +24,11 @@ class MDSClient:
 		self.socket = gevent.socket.socket()
 		self.socket.connect((mdsip, mdsport))
 		self.stub = rpc.RpcStub(guid, self.socket, mds.MDS)
+
+	def Clear():
+		self.socket.close()
+		del self.socket
+		del self.stub
 	
 	def GetChunkServers(self, count=None):
 		arg = msg.GetChunkServers_Request()
@@ -75,6 +80,12 @@ class ChunkServerClient:
 		self.__class__.guid=guid
 		self.endpoint=(csip, csport)
 
+	def __del__(self):
+		self.socket.close()
+		del self.endpoint
+		del self.socket
+		del self.stub
+
 	def getStub_New(self):
 		return self.stub
 	
@@ -106,8 +117,6 @@ class ChunkServerClient:
 		ret = stub.callMethod('DeleteChunk', arg)
 
 	def AssembleChunk(self, volume):
-		# if isinstance(volume, msg.Volume):
-		# 	volume = msg2obj(volume)
 		stub = self.getStub()
 		req = msg.AssembleVolume_Request()
 		obj2msg(volume, req.volume)
@@ -122,21 +131,22 @@ class ChunkServerClient:
 		ret = stub.callMethod('DisassembleVolume', req)
 		return True
 
-	def Clear(self):
-		self.socket.close()
-		del self.getStub
-		del self.socket
-		del self.stub
-
 
 class Client:
 	def __init__(self, mdsip, mdsport):
 		self.guid = Guid.generate()
-		self.chkpool = Pool(ChunkServerClient, ChunkServerClient.Clear)
+		self.chkpool = Pool(ChunkServerClient, ChunkServerClient.__del__)
 		self.mds = MDSClient(self.guid, mdsip, mdsport)
 		self.dmclient = DMClient()
-		#self.CheckVolume()
-		
+		self.CheckVolume()
+	
+	def __del__(self):
+		self.chkpool.dispose()
+		del self.guid
+		del self.mds
+		del self.chkpool
+		del self.dmclient
+
 	# give a list of chunk sizes, return a list of volumes
 	# volume : path node msg.volume
 	def NewChunkList(self, chksizes):
@@ -175,7 +185,14 @@ class Client:
 		return volumelist
 
 	def GetChunkNode(self, name, addr, port=3260):
-		nodelist = libiscsi.discover_sendtargets(addr, port)
+		try:
+			nodelist = libiscsi.discover_sendtargets(addr, port)
+		except IOError as ex:
+			#This IOError is because there's no iscsi node is available now
+			if str(ex).find('connection login retries (reopen_max) 5 exceeded')>-1:
+				return None
+			else:
+				raise ex
 		for node in nodelist:
 			if name == node.name:
 				return node
@@ -190,17 +207,12 @@ class Client:
 		if node != None:
 			try:
 				node.login()
-			## FIXME, find out the type of exception
 			except Exception as ex:
-				print '-----------error type-----------------'
-				print type(ex)
-				ex_str = str(ex)
-				index = ex_str.find('session exists')
-				if index == -1:
-					logging.error(ex_str)
-					return None, None
-				else:
+				#If this node is already mounted
+				if str(ex).find('session exists') > -1:
 					logging.warn('chunk '+node.name+' is already mounted')
+				else:
+					raise ex
 			dev = scandev.get_blockdev_by_targetname(node.name)
 			if dev != None:
 				return dev, node.name
@@ -212,7 +224,7 @@ class Client:
 		nodename = volume.parameters[2]
 		node = self.GetChunkNode(nodename, addr)
 		if node == None:
-			logging.error('Could not find iscsi node to unmount')
+			logging.error('Could not find the chunk to unmount')
 			return False
 		node.logout()
 		chkclient = self.chkpool.get(self.guid, addr, port)
@@ -231,8 +243,19 @@ class Client:
 	def MountVolume(self, volume_name):
 		try:
 			volume = self.mds.ReadVolumeInfo(volume_name)
-		except IOError:
-			logging.error('Volume '+volume_name+' does not exist')
+		except IOError as ex:
+			if str(ex).find('No such file or directory') > -1:
+				logging.error('Volume '+volume_name+' does not exist')
+				return False
+			else:
+				raise ex
+		status = volume.parameters[3]
+		if status == 'active':
+			logging.warn('Volume '+volume_name+' is already mounted')
+			return False
+		isSubvolume = volume.parameters[2]
+		if isSubvolume == 'subvolume':
+			logging.warn('Volume '+volume_name+' is a subvolume')
 			return False
 		if self.MountVolumeTree(volume) == False:
 			return False
@@ -255,14 +278,25 @@ class Client:
 	def UnmountVolume(self, volume_name):
 		try:
 			volume = self.mds.ReadVolumeInfo(volume_name)
-		except IOError:
-			logging.error('Volume '+volume_name+' does not exist')
+		except IOError as ex:
+			if str(ex).find('No such file or directory') > -1:
+				logging.error('Volume '+volume_name+' does not exist')
+				return False
+			else:
+				raise ex
+		status = volume.parameters[3]
+		if status == 'inactive':
+			logging.warn('Volume '+volume_name+' is already unmounted')
+			return False
+		isSubvolume = volume.parameters[2]
+		if isSubvolume == 'subvolume':
+			logging.warn('Volume '+volume_name+' is a subvolume')
 			return False
 		if self.UnmountVolumeTree(volume) == False:
 			return False
 		if self.dmclient.DeleteVolume(volume) == False:
 			return False
-		self.ChangeVolumeStatus(volume, 'active')
+		self.ChangeVolumeStatus(volume, 'inactive')
 		return True
 
 	def UnmountVolumeTree(self, volume):
@@ -276,32 +310,39 @@ class Client:
 	def SplitVolume(self, volume_name):
 		try:
 			volume = self.mds.ReadVolumeInfo(volume_name)
-		except IOError:
-			logging.error('Volume '+volume_name+' does not exist')
-			return False
+		except IOError as ex:
+			if str(ex).find('No such file or directory') > -1:
+				logging.error('Volume '+volume_name+' does not exist')
+				return False
+			else:
+				raise ex
 		if volume.subvolumes[0].assembler == 'chunk':
 			logging.error('This volume is not divisible!')
 			return False
 
-		if self.dmclient.SplitVolume(volume) == False:
+		if self.dmclient.SplitVolume(volume_name) == False:
 			return False
 		self.mds.DeleteVolumeInfo(volume)
 		for subvol in volume.subvolumes:
-			subvol.parameters[2] = 'free'
+			subvol.parameters[2] = 'volume'
 			self.mds.WriteVolumeInfo(subvol)
 		return True
 
 	def CreateVolume(self, volname, volsize, voltype, chksizes, volnames, params):
 		vollist = []
 		if len(volnames) > 0:
+			volsize = 0
 			for name in volnames:
 				try:
-					volume = self.mds.ReadVolumeInfo(name)
-				except IOError:
-					logging.error('Volume '+name+' does not exist')
-					return False
-				if vol.parameters[2] == 'used':
-					logging.error('volume '+name+' has been used')
+					vol = self.mds.ReadVolumeInfo(name)
+				except IOError as ex:
+					if str(ex).find('No such file or directory') > -1:
+						logging.error('Volume '+name+' does not exist')
+						return False
+					else:
+						raise ex
+				if vol.parameters[2] == 'subvolume':
+					logging.error('volume '+name+' is a subvolume of another volume')
 					return False
 				if vol.parameters[3] == 'inactive':
 					logging.warn('Volume '+name+' is inactive')
@@ -309,6 +350,7 @@ class Client:
 					if not self.MountVolume(name):
 						logging.error('Mount volume '+name+' failed')
 						return False
+				volsize += vol.size
 				vollist.append(vol)
 		
 		if len(chksizes) == 0 and len(volnames) == 0:
@@ -338,7 +380,7 @@ class Client:
 		volume.assembler = voltype
 		volume.subvolumes = vollist
 		volume.guid = Guid.toStr(Guid.generate())
-		volume.parameters = [volname, '/dev/mapper/'+volname, 'free', 'active']
+		volume.parameters = [volname, '/dev/mapper/'+volname, 'volume', 'active']
 		volume.parameters.extend(params)
 
 		if self.dmclient.MapVolume(volume) == False:
@@ -351,7 +393,7 @@ class Client:
 		self.mds.WriteVolumeInfo(volume)
 		for vol in vollist:
 			if vol.assembler != 'chunk':
-				vol.parameters[2] = 'used'
+				vol.parameters[2] = 'subvolume'
 				vol.parameters[3] = 'active'
 			self.mds.WriteVolumeInfo(vol)
 
@@ -360,10 +402,13 @@ class Client:
 	def DeleteVolume(self, volume_name):
 		try:
 			volume = self.mds.ReadVolumeInfo(volume_name)
-		except IOError:
-			logging.error('Volume '+volume_name+' does not exist')
-			return False
-		if self.DeleteVolumeTree(volume_name) == False:
+		except IOError as ex:
+			if str(ex).find('No such file or directory') > -1:
+				logging.error(sys.stderr,'Volume '+volume_name+' does not exist')
+				return False
+			else:
+				raise ex
+		if self.DeleteVolumeTree(volume) == False:
 			return False
 		if self.dmclient.DeleteVolume(volume) == False:
 			return False
@@ -374,7 +419,8 @@ class Client:
 			addr = volume.parameters[3]
 			port = int(volume.parameters[4])
 			chkclient = self.chkpool.get(self.guid, addr, port)
-			self.UnmountChunk(volume)
+			if self.UnmountChunk(volume) == False:
+				return False
 			chkclient.DeleteChunk(volume)
 			self.mds.DeleteVolumeInfo(volume)
 			return True
@@ -397,9 +443,6 @@ class Client:
 				volume.parameters[3] = status
 				self.mds.WriteVolumeInfo(volume)
 
-
-	def Clear(self):
-		pass
 
 def test():
 	global PARAM

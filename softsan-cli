@@ -19,7 +19,7 @@ branch = [
 cmdstruct=(\
 	('name',	'n',	'',			'create a volume'),\
 	('params',  'p',	'',			'volume parameters'),\
-	('size',	's',	'',			'remove a volume'),\
+	('size',	's',	'0',		'remove a volume'),\
 	('count',	'c', 	'0',		'list object information'),\
 	('type',	't', 	'linear',	'split a volume into subvolumes'),\
 	('tree',	'', 	'0',		'list object information'),\
@@ -44,18 +44,22 @@ def ListVolume(mds, volume_name, tree):
 		return True
 	try:
 		volume = mds.ReadVolumeInfo(volume_name)
-	except IOError:
-		print >>sys.stderr,'Volume '+volume_name+' does not exist'
-		return False
+	except IOError as ex:
+		if str(ex).find('No such file or directory') > -1:
+			print >>sys.stderr,'Volume '+volume_name+' does not exist'
+			return False
+		else:
+			raise ex
 	if volume.assembler != 'chunk':
 		print 'Name:			',volume.parameters[0]
 		print 'Path:			',volume.parameters[1]
 		print 'Type:			',volume.assembler
 		print 'Size:			',volume.size, 'MB'
 		print 'Status:			',volume.parameters[3]
-		print 'Number of subvolumes:	',len(volume.subvolumes)
+		print 'Number of subvolumes:	',len(volume.subvolumes),'\n'
 		if tree == '1':
 			print_tree(volume, '')
+			print '\n'
 	return True
 
 def print_tree(volume, prefix):
@@ -90,8 +94,11 @@ def ParseTable(args, subvolumes):
 	if args.size.isdigit() == False:
 		print >>sys.stderr,'volume size must be digit'
 		return None
-	if args.size != '':
+	if args.size != '0':
 		ret.size = int(args.size)
+	if ret.size < 0:
+		print >>sys.stderr,'Volume size must not be negative'
+		return None
 	if args.type != 'linear' and args.type != 'striped' and\
 	   args.type != 'mirror' and args.type != 'gfs':
 		print >>sys.stderr,'volume type can only be linear/striped/mirror/gfs'
@@ -114,6 +121,9 @@ def ParseTable(args, subvolumes):
 		print >>sys.stderr,'count must not be negative'
 		return None
 	if count == 0:
+		if ret.size == 0:
+			print >>sys.stderr,'Volume size must be specified'
+			return None
 		if ret.type == 'linear' or ret.type == 'gfs':
 			chksize = CHUNKSIZE
 			totsize = ret.size
@@ -127,6 +137,9 @@ def ParseTable(args, subvolumes):
 	if count > 0:
 		num = len(subvolumes)
 		if num == 0:
+			if ret.size == 0:
+				print >>sys.stderr,'Volume size must be specified'
+				return None
 			chksize = ret.size/count
 			if chksize < 4:
 				print >>sys.stderr,'too many chunks, single chunk size too samll'
@@ -139,7 +152,7 @@ def ParseTable(args, subvolumes):
 				ret.chunksizes.append(totsize)
 			return ret
 		if num != count:
-			print >>sys.stderr,'incorrect arguments count'
+			print >>sys.stderr,'incorrect number of arguments for count'
 			return None
 		if subvolumes[0].isdigit() == True:
 			totsize = 0
@@ -149,6 +162,8 @@ def ParseTable(args, subvolumes):
 					return None
 				ret.chunksizes.append(int(subvolumes[i]))
 				totsize += int(int(subvolumes[i]))
+			if ret.size == 0:
+				ret.size = totsize
 			if totsize > ret.size:
 				print >>sys.stderr,'chunk size summary is larger than voluem size'
 				return None
@@ -211,9 +226,9 @@ class CLI(cmd.Cmd):
 		params,remains = self.get_params(cmdline)
 		if self.check_remains(remains):
 			if self.client.DeleteVolume(params.name):
-				print 'Volume '+ret.name+' successfully removed'
+				print 'Volume '+params.name+' successfully removed'
 			else:
-				print 'Remove volume '+ret.name+' failed'
+				print 'Remove volume '+params.name+' failed'
 	def help_remove(self):
 		print 'remove volume'
 
@@ -233,9 +248,9 @@ class CLI(cmd.Cmd):
 		params,remains = self.get_params(cmdline)
 		if self.check_remains(remains):
 			if self.client.SplitVolume(params.name):
-				print 'Volume '+ret.name+' successfully splited'
+				print 'Volume '+params.name+' successfully splited'
 			else:
-				print 'Split volume '+ret.name+' failed'
+				print 'Split volume '+params.name+' failed'
 	def help_split(self):
 		print 'split a volume into subvolume(s)'
 
@@ -243,9 +258,9 @@ class CLI(cmd.Cmd):
 		params,remains = self.get_params(cmdline)
 		if self.check_remains(remains):
 			if self.client.MountVolume(params.name):
-				print 'Volume '+ret.name+' successfully mounted'
+				print 'Volume '+params.name+' successfully mounted'
 			else:
-				print 'Mount volume '+ret.name+' failed'
+				print 'Mount volume '+params.name+' failed'
 	def help_mount(self):
 		print 'mount volume'
 
@@ -253,11 +268,18 @@ class CLI(cmd.Cmd):
 		params,remains = self.get_params(cmdline)
 		if self.check_remains(remains):
 			if self.client.UnmountVolume(params.name):
-				print 'Volume '+ret.name+' successfully unmounted'
+				print 'Volume '+params.name+' successfully unmounted'
 			else:
-				print 'Unmount volume '+ret.name+' failed'
+				print 'Unmount volume '+params.name+' failed'
 	def help_unmount(self):
 		print 'unmount volume'
+
+	def do_checkvolume(self, cmdline):
+		params,remains = self.get_params(cmdline)
+		if self.check_remains(remains):
+			self.client.CheckVolume()
+	def help_checkvolume(self):
+		print 'Check volume status'
 
 	def do_exit(self, cmdline):
 		exit(0)
