@@ -11,10 +11,9 @@ import ClientDeamon
 from util import message2object as msg2obj
 from util import object2message as obj2msg
 from util import Pool
-from ClientDeamon import DMClient
+from DeviceMapperClient import DMClient
 from collections import Iterable
 import util, config
-
 
 #default chunk size
 CHUNKSIZE = 64
@@ -188,7 +187,7 @@ class Client:
 		try:
 			nodelist = libiscsi.discover_sendtargets(addr, port)
 		except IOError as ex:
-			#This IOError is because there's no iscsi node is available now
+			#This IOError is because there's no iscsi node is found now
 			if str(ex).find('connection login retries (reopen_max) 5 exceeded')>-1:
 				return None
 			else:
@@ -373,8 +372,7 @@ class Client:
 			if vollist == None:
 				logging.error('New Chunk(s) failed')
 				return False
-			# for vol in vollist:
-			# 	print 'vol.size: ', vol.size
+			
 		volume = Object()
 		volume.size = volsize
 		volume.assembler = voltype
@@ -450,61 +448,61 @@ def test():
 	items = client.mds.ListDirectory('/')
 	for item in items:
 		print item
-	#client.ListVolume('hello_softsan_striped')
+	client.ListVolume('hello_softsan_striped')
 
-	# create a stiped type volume
-	# arg = Object()
-	# arg.type = 'striped'
-	# arg.chunksizes = []
-	# arg.subvolumes = []
-	# arg.parameters = []
-	# arg.name = 'hello_softsan_striped'
-	# arg.size = 128
-	# client.CreateVolume(arg)
+	create a stiped type volume
+	arg = Object()
+	arg.type = 'striped'
+	arg.chunksizes = []
+	arg.subvolumes = []
+	arg.parameters = []
+	arg.name = 'hello_softsan_striped'
+	arg.size = 128
+	client.CreateVolume(arg)
 
-	# create 2 linear type volumes and then 
-	# build a striped volume with these two linear volumes
+	create 2 linear type volumes and then 
+	build a striped volume with these two linear volumes
 
-	# arg = Object()
-	# arg.type = 'linear'
-	# arg.chunksizes = []
-	# arg.subvolumes = []
-	# arg.parameters = []
-	# arg.name = 'hello_softsan_1'
-	# arg.size = 100
-	# client.CreateVolume(arg)
+	arg = Object()
+	arg.type = 'linear'
+	arg.chunksizes = []
+	arg.subvolumes = []
+	arg.parameters = []
+	arg.name = 'hello_softsan_1'
+	arg.size = 100
+	client.CreateVolume(arg)
 
-	# arg = Object()
-	# arg.type = 'linear'
-	# arg.chunksizes = []
-	# arg.subvolumes = []
-	# arg.parameters = []
-	# arg.name = 'hello_softsan_2'
-	# arg.size = 100
-	# client.CreateVolume(arg)
+	arg = Object()
+	arg.type = 'linear'
+	arg.chunksizes = []
+	arg.subvolumes = []
+	arg.parameters = []
+	arg.name = 'hello_softsan_2'
+	arg.size = 100
+	client.CreateVolume(arg)
 
-	# arg = Object()
-	# arg.type = 'striped'
-	# arg.chunksizes = []
-	# arg.subvolumes = ['hello_softsan_1', 'hello_softsan_2']
-	# arg.parameters = []
-	# arg.name = 'hello_softsan_3'
-	# arg.size = 200
-	# client.CreateVolume(arg)
-	# # client.DeleteVolume('hello_softsan_1')
-	# # client.DeleteVolume('hello_softsan_2')
-	# client.DeleteVolume('hello_softsan_3')
+	arg = Object()
+	arg.type = 'striped'
+	arg.chunksizes = []
+	arg.subvolumes = ['hello_softsan_1', 'hello_softsan_2']
+	arg.parameters = []
+	arg.name = 'hello_softsan_3'
+	arg.size = 200
+	client.CreateVolume(arg)
+	# client.DeleteVolume('hello_softsan_1')
+	# client.DeleteVolume('hello_softsan_2')
+	client.DeleteVolume('hello_softsan_3')
 
-	# arg = Object()
-	# arg.type = 'gfs'
-	# arg.chunksizes = []
-	# arg.subvolumes = []
-	# arg.parameters = []
-	# arg.name = 'gfs'
-	# arg.size = 80
-	# client.CreateVolume(arg)
+	arg = Object()
+	arg.type = 'gfs'
+	arg.chunksizes = []
+	arg.subvolumes = []
+	arg.parameters = []
+	arg.name = 'gfs'
+	arg.size = 80
+	client.CreateVolume(arg)
 
-	#client.DeleteVolume('gfs')
+	client.DeleteVolume('gfs')
 	client.Clear()
 
 

@@ -19,10 +19,10 @@ branch = [
 cmdstruct=(\
 	('name',	'n',	'',			'create a volume'),\
 	('params',  'p',	'',			'volume parameters'),\
-	('size',	's',	'0',		'remove a volume'),\
-	('count',	'c', 	'0',		'list object information'),\
-	('type',	't', 	'linear',	'split a volume into subvolumes'),\
-	('tree',	'', 	'0',		'list object information'),\
+	('size',	's',	'0',		'volume size'),\
+	('count',	'c', 	'0',		'subvolumes or chunk count'),\
+	('type',	't', 	'linear',	'volume type'),\
+	('tree',	'', 	'0',		'display a volume in from of tree'),\
 	('all',		'a', 	'0',		'all of the volumes or not'),\
 	('help',	'h',	False,		'this help'),\
 )
@@ -165,10 +165,10 @@ def ParseTable(args, subvolumes):
 			if ret.size == 0:
 				ret.size = totsize
 			if totsize > ret.size:
-				print >>sys.stderr,'chunk size summary is larger than voluem size'
+				print >>sys.stderr,'chunk size summation is larger than voluem size'
 				return None
 			if totsize < ret.size:
-				print >>sys.stdwar,'warning: chunk size summary is less than voluem size'
+				print >>sys.stdwar,'warning: chunk size summation is less than voluem size'
 			remain = ret.size-totsize
 			while remain > CHUNKSIZE:
 				ret.chunksizes.append(CHUNKSIZE)
