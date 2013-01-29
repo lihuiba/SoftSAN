@@ -442,69 +442,69 @@ class Client:
 				self.mds.WriteVolumeInfo(volume)
 
 
-def test():
-	global PARAM
-	client = Client('0.0.0.0', 22136)
-	items = client.mds.ListDirectory('/')
-	for item in items:
-		print item
-	client.ListVolume('hello_softsan_striped')
+# def test():
+# 	global PARAM
+# 	client = Client('0.0.0.0', 22136)
+# 	items = client.mds.ListDirectory('/')
+# 	for item in items:
+# 		print item
+# 	client.ListVolume('hello_softsan_striped')
 
-	create a stiped type volume
-	arg = Object()
-	arg.type = 'striped'
-	arg.chunksizes = []
-	arg.subvolumes = []
-	arg.parameters = []
-	arg.name = 'hello_softsan_striped'
-	arg.size = 128
-	client.CreateVolume(arg)
+# 	create a stiped type volume
+# 	arg = Object()
+# 	arg.type = 'striped'
+# 	arg.chunksizes = []
+# 	arg.subvolumes = []
+# 	arg.parameters = []
+# 	arg.name = 'hello_softsan_striped'
+# 	arg.size = 128
+# 	client.CreateVolume(arg)
 
-	create 2 linear type volumes and then 
-	build a striped volume with these two linear volumes
+# 	create 2 linear type volumes and then 
+# 	build a striped volume with these two linear volumes
 
-	arg = Object()
-	arg.type = 'linear'
-	arg.chunksizes = []
-	arg.subvolumes = []
-	arg.parameters = []
-	arg.name = 'hello_softsan_1'
-	arg.size = 100
-	client.CreateVolume(arg)
+# 	arg = Object()
+# 	arg.type = 'linear'
+# 	arg.chunksizes = []
+# 	arg.subvolumes = []
+# 	arg.parameters = []
+# 	arg.name = 'hello_softsan_1'
+# 	arg.size = 100
+# 	client.CreateVolume(arg)
 
-	arg = Object()
-	arg.type = 'linear'
-	arg.chunksizes = []
-	arg.subvolumes = []
-	arg.parameters = []
-	arg.name = 'hello_softsan_2'
-	arg.size = 100
-	client.CreateVolume(arg)
+# 	arg = Object()
+# 	arg.type = 'linear'
+# 	arg.chunksizes = []
+# 	arg.subvolumes = []
+# 	arg.parameters = []
+# 	arg.name = 'hello_softsan_2'
+# 	arg.size = 100
+# 	client.CreateVolume(arg)
 
-	arg = Object()
-	arg.type = 'striped'
-	arg.chunksizes = []
-	arg.subvolumes = ['hello_softsan_1', 'hello_softsan_2']
-	arg.parameters = []
-	arg.name = 'hello_softsan_3'
-	arg.size = 200
-	client.CreateVolume(arg)
-	# client.DeleteVolume('hello_softsan_1')
-	# client.DeleteVolume('hello_softsan_2')
-	client.DeleteVolume('hello_softsan_3')
+# 	arg = Object()
+# 	arg.type = 'striped'
+# 	arg.chunksizes = []
+# 	arg.subvolumes = ['hello_softsan_1', 'hello_softsan_2']
+# 	arg.parameters = []
+# 	arg.name = 'hello_softsan_3'
+# 	arg.size = 200
+# 	client.CreateVolume(arg)
+# 	# client.DeleteVolume('hello_softsan_1')
+# 	# client.DeleteVolume('hello_softsan_2')
+# 	client.DeleteVolume('hello_softsan_3')
 
-	arg = Object()
-	arg.type = 'gfs'
-	arg.chunksizes = []
-	arg.subvolumes = []
-	arg.parameters = []
-	arg.name = 'gfs'
-	arg.size = 80
-	client.CreateVolume(arg)
+# 	arg = Object()
+# 	arg.type = 'gfs'
+# 	arg.chunksizes = []
+# 	arg.subvolumes = []
+# 	arg.parameters = []
+# 	arg.name = 'gfs'
+# 	arg.size = 80
+# 	client.CreateVolume(arg)
 
-	client.DeleteVolume('gfs')
-	client.Clear()
+# 	client.DeleteVolume('gfs')
+# 	client.Clear()
 
 
-if __name__=='__main__':
-	test()
+# if __name__=='__main__':
+# 	test()
