@@ -7,7 +7,6 @@ import block.dm as dm
 from mds import Object
 import libiscsi, os
 import scandev, config
-import ClientDeamon
 from util import message2object as msg2obj
 from util import object2message as obj2msg
 from util import Pool
